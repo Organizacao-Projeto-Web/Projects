@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prontuário de Fisioterapia</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen text-gray-800">
+
+  <!-- TELA DE LOGIN -->
+  <div id="login-screen" class="flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+      <h2 class="text-2xl font-bold mb-6 text-teal-700 text-center">FisioProntuário - Login</h2>
+      <form id="login-form" onsubmit="fazerLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">E-mail</label>
+          <input type="email" id="login-email" required class="w-full border p-2 rounded mt-1 focus:ring-teal-500 focus:border-teal-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Senha</label>
+          <input type="password" id="login-senha" required class="w-full border p-2 rounded mt-1 focus:ring-teal-500 focus:border-teal-500">
+        </div>
+        <button type="submit" class="w-full bg-teal-600 text-white p-2 rounded hover:bg-teal-700 font-semibold">Entrar</button>
+      </form>
+      <p id="login-error" class="text-red-500 text-sm mt-4 hidden text-center"></p>
+    </div>
+  </div>
+
+  <!-- PAINEL PRINCIPAL DO FISIOTERAPEUTA -->
+  <div id="app-screen" class="hidden">
+    <!-- NAVBAR -->
+    <nav class="bg-teal-700 text-white p-4 flex justify-between items-center shadow-md">
+      <h1 class="text-xl font-bold">🩺 FisioProntuário</h1>
+      <div class="flex items-center gap-4">
+        <span id="user-display" class="text-sm bg-teal-800 px-3 py-1 rounded-full"></span>
+        <button onclick="logout()" class="bg-red-500 text-sm px-3 py-1 rounded hover:bg-red-600">Sair</button>
+      </div>
+    </nav>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <div class="container mx-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+
+      <!-- COLUNA 1: SELEÇÃO E CADASTRO DE PACIENTE -->
+      <div class="bg-white p-5 rounded-lg shadow space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-gray-700 mb-3">Pacientes</h2>
+          <button onclick="carregarPacientes()" class="text-xs bg-gray-200 p-1 px-2 rounded hover:bg-gray-300 mb-3">🔄 Atualizar Lista</button>
+          <ul id="lista-pacientes" class="divide-y max-h-60 overflow-y-auto">
+            <!-- Pacientes inseridos via JS -->
+          </ul>
+        </div>
+
+        <hr>
+
+        <div>
+          <h3 class="text-md font-semibold text-gray-700 mb-2">Novo Paciente</h3>
+          <form onsubmit="cadastrarPaciente(event)" class="space-y-3">
+            <input type="text" id="pac-nome" placeholder="Nome Completo" required class="w-full border p-2 rounded text-sm">
+            <input type="text" id="pac-cpf" placeholder="CPF" class="w-full border p-2 rounded text-sm">
+            <input type="tel" id="pac-telefone" placeholder="Telefone" class="w-full border p-2 rounded text-sm">
+            <input type="date" id="pac-nascimento" class="w-full border p-2 rounded text-sm">
+            <button type="submit" class="w-full bg-teal-600 text-white p-2 rounded text-sm hover:bg-teal-700">Cadastrar Paciente</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- COLUNA 2 E 3: REGISTRO DE ATENDIMENTO E HISTÓRICO -->
+      <div class="md:col-span-2 space-y-6">
+        
+        <!-- FORMULÁRIO DE ANAMNESE E CONSULTA -->
+        <div class="bg-white p-5 rounded-lg shadow">
+          <h2 class="text-lg font-bold text-gray-700 mb-2">Novo Atendimento / Sessão</h2>
+          <p id="paciente-selecionado-info" class="text-sm text-teal-600 font-semibold mb-4">Nenhum paciente selecionado</p>
+
+          <form onsubmit="registrarConsulta(event)" class="space-y-4">
+            <input type="hidden" id="selected-paciente-id">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Anamnese / Queixa Principal</label>
+              <textarea id="queixa" rows="2" required placeholder="Relato de dores, histórico da lesão..." class="w-full border p-2 rounded text-sm"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Diagnóstico Cinesiológico Funcional</label>
+              <textarea id="diagnostico" rows="2" placeholder="Limitação de ADM, fraqueza muscular, postura..." class="w-full border p-2 rounded text-sm"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Conduta Terapêutica / Exercícios Aplicados</label>
+              <textarea id="prescricao" rows="2" placeholder="Cinesioterapia, eletroterapia, terapia manual..." class="w-full border p-2 rounded text-sm"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Evolução / Observações da Sessão</label>
+              <textarea id="observacoes" rows="2" placeholder="Feedback do paciente pós-sessão..." class="w-full border p-2 rounded text-sm"></textarea>
+            </div>
+            <button type="submit" class="bg-teal-700 text-white px-4 py-2 rounded hover:bg-teal-800 font-semibold">Salvar Sessão no Prontuário</button>
+          </form>
+        </div>
+
+        <!-- HISTÓRICO DE SESSÕES DO PACIENTE -->
+        <div class="bg-white p-5 rounded-lg shadow">
+          <h2 class="text-lg font-bold text-gray-700 mb-4">Histórico do Prontuário</h2>
+          <div id="historico-consultas" class="space-y-4 max-h-80 overflow-y-auto">
+            <p class="text-sm text-gray-500">Selecione um paciente para carregar o histórico.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "http://127.0.0.1:3001/api";
+
+    async function fazerLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById("login-email").value;
+      const senha = document.getElementById("login-senha").value;
+
+      const formData = new URLSearchParams();
+      formData.append("username", email);
+      formData.append("password", senha);
+
+      try {
+        const res = await fetch(`${API_URL}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: formData
+        });
+
+        if (!res.ok) throw new Error("Usuário ou senha incorretos.");
+
+        const data = await res.json();
+        localStorage.setItem("token", data.access_token);
+        iniciarApp();
+      } catch (err) {
+        document.getElementById("login-error").innerText = err.message;
+        document.getElementById("login-error").classList.remove("hidden");
+      }
+    }
+
+    async function iniciarApp() {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      try {
+        const res = await fetch(`${API_URL}/usuarios/me`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error();
+        const user = await res.json();
+
+        document.getElementById("user-display").innerText = `${user.nome} (CREFITO: ${user.crefito || 'N/A'})`;
+        document.getElementById("login-screen").classList.add("hidden");
+        document.getElementById("app-screen").classList.remove("hidden");
+
+        carregarPacientes();
+      } catch {
+        logout();
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem("token");
+      document.getElementById("app-screen").classList.add("hidden");
+      document.getElementById("login-screen").classList.remove("hidden");
+    }
+
+    async function carregarPacientes() {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/pacientes`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const pacientes = await res.json();
+
+      const lista = document.getElementById("lista-pacientes");
+      lista.innerHTML = "";
+      pacientes.forEach(p => {
+        const li = document.createElement("li");
+        li.className = "py-2 cursor-pointer hover:bg-teal-50 px-2 rounded text-sm flex justify-between items-center";
+        li.onclick = () => selecionarPaciente(p);
+        li.innerHTML = `<div><strong>${p.nome}</strong><br><span class="text-xs text-gray-500">${p.cpf || 'Sem CPF'}</span></div>`;
+        lista.appendChild(li);
+      });
+    }
+
+    function selecionarPaciente(paciente) {
+      document.getElementById("selected-paciente-id").value = paciente.id;
+      document.getElementById("paciente-selecionado-info").innerText = `Paciente Ativo: ${paciente.nome}`;
+      carregarHistorico(paciente.id);
+    }
+
+    async function cadastrarPaciente(e) {
+      e.preventDefault();
+      const token = localStorage.getItem("token");
+      const body = {
+        nome: document.getElementById("pac-nome").value,
+        cpf: document.getElementById("pac-cpf").value,
+        telefone: document.getElementById("pac-telefone").value,
+        data_nascimento: document.getElementById("pac-nascimento").value || null,
+        clinica_id: 1
+      };
+
+      await fetch(`${API_URL}/pacientes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify(body)
+      });
+
+      e.target.reset();
+      carregarPacientes();
+    }
+
+    async function registrarConsulta(e) {
+      e.preventDefault();
+      const token = localStorage.getItem("token");
+      const pacienteId = document.getElementById("selected-paciente-id").value;
+
+      if (!pacienteId) {
+        alert("Selecione um paciente na lista primeiro.");
+        return;
+      }
+
+      const body = {
+        paciente_id: parseInt(pacienteId),
+        queixa_principal: document.getElementById("queixa").value,
+        diagnostico: document.getElementById("diagnostico").value,
+        prescricao: document.getElementById("prescricao").value,
+        observacoes: document.getElementById("observacoes").value
+      };
+
+      await fetch(`${API_URL}/consultas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify(body)
+      });
+
+      e.target.reset();
+      carregarHistorico(pacienteId);
+    }
+
+    async function carregarHistorico(pacienteId) {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/consultas/paciente/${pacienteId}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const consultas = await res.json();
+
+      const container = document.getElementById("historico-consultas");
+      container.innerHTML = "";
+
+      if (consultas.length === 0) {
+        container.innerHTML = "<p class='text-sm text-gray-500'>Nenhuma sessão registrada para este paciente.</p>";
+        return;
+      }
+
+      consultas.forEach(c => {
+        const data = new Date(c.created_at).toLocaleDateString("pt-BR");
+        const div = document.createElement("div");
+        div.className = "border-l-4 border-teal-600 bg-gray-50 p-3 rounded text-sm space-y-1";
+        div.innerHTML = `
+          <div class="text-xs font-bold text-teal-800">Sessão em: ${data}</div>
+          <div><strong>Anamnese:</strong> ${c.queixa_principal}</div>
+          <div><strong>Diagnóstico:</strong> ${c.diagnostico || '-'}</div>
+          <div><strong>Conduta/Exercícios:</strong> ${c.prescricao || '-'}</div>
+          <div><strong>Evolução:</strong> ${c.observacoes || '-'}</div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // Auto-login se o token já existir
+    iniciarApp();
+  </script>
+</body>
+</html>

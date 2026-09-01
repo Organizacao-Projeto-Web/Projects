@@ -1,0 +1,18 @@
+# Ambiente Virtual
+venv/
+backend/venv/
+env/
+
+# Configurações com Senhas e Chaves
+.env
+backend/.env
+
+# Arquivos Temporários do Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Arquivos de IDE e Sistema
+.vscode/
+.idea/
+.DS_Store
