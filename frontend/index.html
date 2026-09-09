@@ -3,272 +3,184 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Prontuário de Fisioterapia</title>
+  <title>Reab - Gestão de Fisioterapia</title>
   <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 font-sans min-h-screen text-gray-800">
+  <style>
+    @keyframes pulse-soft {
+      0%, 100% { transform: scale(1); opacity: 0.15; }
+      50% { transform: scale(1.08); opacity: 0.25; }
+    }
+    .animate-blob-1 { animation: pulse-soft 7s ease-in-out infinite; }
+    .animate-blob-2 { animation: pulse-soft 9s ease-in-out infinite 2s; }
 
-  <!-- TELA DE LOGIN -->
-  <div id="login-screen" class="flex items-center justify-center min-h-screen">
-    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-      <h2 class="text-2xl font-bold mb-6 text-teal-700 text-center">FisioProntuário - Login</h2>
+    @media print {
+      body * { visibility: hidden; }
+      #area-impressao, #area-impressao * { visibility: visible; }
+      #area-impressao { position: absolute; left: 0; top: 0; width: 100%; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 font-sans min-h-screen text-slate-800 antialiased selection:bg-teal-500 selection:text-white">
+
+  <!-- TELA 1: AUTENTICAÇÃO CLARA (REAB) -->
+  <div id="login-screen" class="relative flex items-center justify-center min-h-screen overflow-hidden bg-gradient-to-br from-slate-100 via-teal-50/50 to-slate-100">
+    
+    <!-- ELEMENTOS SUAVES DE FUNDO -->
+    <div class="absolute -top-20 -left-20 w-96 h-96 bg-teal-400 rounded-full blur-3xl animate-blob-1 pointer-events-none"></div>
+    <div class="absolute -bottom-20 -right-20 w-96 h-96 bg-cyan-400 rounded-full blur-3xl animate-blob-2 pointer-events-none"></div>
+
+    <!-- CARD BRANCO DE LOGIN -->
+    <div class="relative z-10 bg-white p-8 sm:p-10 rounded-3xl shadow-xl w-full max-w-md border border-slate-100 transition-all">
+      
+      <!-- LOGO: COLUNA VERTEBRAL & ALINHAMENTO -->
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-teal-600 to-cyan-500 text-white mb-3 shadow-lg shadow-teal-600/25">
+          <svg class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v20" />
+            <path d="M8 6h8" />
+            <path d="M7 10h10" />
+            <path d="M8 14h8" />
+            <path d="M9 18h6" />
+            <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
+            <circle cx="12" cy="10" r="1.5" fill="currentColor"/>
+            <circle cx="12" cy="14" r="1.5" fill="currentColor"/>
+            <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
+          </svg>
+        </div>
+        <h2 class="text-3xl font-extrabold text-slate-800 tracking-tight">Reab</h2>
+        <p id="auth-subtitle" class="text-xs font-semibold text-teal-700 mt-1 uppercase tracking-wider">Gestão de Fisioterapia</p>
+      </div>
+
+      <!-- FORMULÁRIO DE LOGIN -->
       <form id="login-form" onsubmit="fazerLogin(event)" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700">E-mail</label>
-          <input type="email" id="login-email" required class="w-full border p-2 rounded mt-1 focus:ring-teal-500 focus:border-teal-500">
+          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">E-mail</label>
+          <input type="email" id="login-email" required placeholder="seu@email.com" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition text-sm text-slate-800 placeholder-slate-400">
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700">Senha</label>
-          <input type="password" id="login-senha" required class="w-full border p-2 rounded mt-1 focus:ring-teal-500 focus:border-teal-500">
+          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Senha</label>
+          <input type="password" id="login-senha" required placeholder="••••••••" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition text-sm text-slate-800 placeholder-slate-400">
         </div>
-        <button type="submit" class="w-full bg-teal-600 text-white p-2 rounded hover:bg-teal-700 font-semibold">Entrar</button>
+        <button type="submit" class="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 active:scale-[0.99] text-white p-3 rounded-xl font-bold shadow-md shadow-teal-600/20 transition-all text-sm">Entrar no Sistema</button>
       </form>
-      <p id="login-error" class="text-red-500 text-sm mt-4 hidden text-center"></p>
+
+      <!-- FORMULÁRIO DE CADASTRO DO FISIOTERAPEUTA -->
+      <form id="register-form" onsubmit="cadastrarFisioterapeuta(event)" class="space-y-4 hidden">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Nome Completo</label>
+          <input type="text" id="reg-nome" required placeholder="Dr. Nome Sobrenome" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition text-sm text-slate-800 placeholder-slate-400">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">CREFITO</label>
+          <input type="text" id="reg-crefito" placeholder="Ex: 123456-F" required class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition text-sm text-slate-800 placeholder-slate-400">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">E-mail</label>
+          <input type="email" id="reg-email" required placeholder="seu@email.com" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition text-sm text-slate-800 placeholder-slate-400">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Senha</label>
+          <input type="password" id="reg-senha" required placeholder="••••••••" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition text-sm text-slate-800 placeholder-slate-400">
+        </div>
+        <button type="submit" class="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 active:scale-[0.99] text-white p-3 rounded-xl font-bold shadow-md shadow-teal-600/20 transition-all text-sm">Criar Minha Conta</button>
+      </form>
+
+      <!-- MENSAGENS -->
+      <p id="auth-error" class="text-red-600 text-xs mt-4 hidden text-center font-medium bg-red-50 p-2 rounded-lg border border-red-100"></p>
+      <p id="auth-success" class="text-emerald-700 text-xs mt-4 hidden text-center font-medium bg-emerald-50 p-2 rounded-lg border border-emerald-100"></p>
+
+      <!-- ALTERNAR LOGIN/CADASTRO -->
+      <div class="mt-6 text-center border-t border-slate-100 pt-4">
+        <button id="toggle-auth-btn" onclick="alternarTelaAuth()" class="text-xs text-teal-700 font-medium hover:text-teal-800 hover:underline transition">
+          Não tem uma conta? Cadastre-se
+        </button>
+      </div>
     </div>
   </div>
 
-  <!-- PAINEL PRINCIPAL DO FISIOTERAPEUTA -->
-  <div id="app-screen" class="hidden">
-    <!-- NAVBAR -->
-    <nav class="bg-teal-700 text-white p-4 flex justify-between items-center shadow-md">
-      <h1 class="text-xl font-bold">🩺 FisioProntuário</h1>
+  <!-- PAINEL PRINCIPAL -->
+  <div id="app-screen" class="hidden min-h-screen bg-slate-100">
+    <nav class="bg-teal-700 text-white p-4 flex justify-between items-center shadow-md no-print">
+      <h1 class="text-xl font-bold flex items-center gap-2">
+        <svg class="w-6 h-6 text-teal-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v20M8 6h8M7 10h10M8 14h8M9 18h6"/>
+        </svg>
+        Reab
+      </h1>
       <div class="flex items-center gap-4">
         <span id="user-display" class="text-sm bg-teal-800 px-3 py-1 rounded-full"></span>
-        <button onclick="logout()" class="bg-red-500 text-sm px-3 py-1 rounded hover:bg-red-600">Sair</button>
+        <button onclick="logout()" class="bg-red-500 text-sm px-3 py-1 rounded hover:bg-red-600 transition">Sair</button>
       </div>
     </nav>
 
-    <!-- CONTEÚDO PRINCIPAL -->
     <div class="container mx-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-
-      <!-- COLUNA 1: SELEÇÃO E CADASTRO DE PACIENTE -->
-      <div class="bg-white p-5 rounded-lg shadow space-y-6">
+      <!-- COLUNA 1: PACIENTES -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-6 no-print">
         <div>
-          <h2 class="text-lg font-bold text-gray-700 mb-3">Pacientes</h2>
-          <button onclick="carregarPacientes()" class="text-xs bg-gray-200 p-1 px-2 rounded hover:bg-gray-300 mb-3">🔄 Atualizar Lista</button>
-          <ul id="lista-pacientes" class="divide-y max-h-60 overflow-y-auto">
-            <!-- Pacientes inseridos via JS -->
-          </ul>
+          <div class="flex justify-between items-center mb-2">
+            <h2 class="text-lg font-bold text-slate-800">Pacientes</h2>
+            <button onclick="carregarPacientes()" class="text-xs bg-slate-100 p-1 px-2 rounded hover:bg-slate-200 transition">🔄 Atualizar</button>
+          </div>
+          <input type="text" id="busca-paciente" onkeyup="filtrarPacientes()" placeholder="🔍 Buscar por nome ou CPF..." class="w-full border p-2 rounded-lg text-sm mb-3 focus:ring-2 focus:ring-teal-500 outline-none">
+          <ul id="lista-pacientes" class="divide-y max-h-60 overflow-y-auto"></ul>
         </div>
-
         <hr>
-
         <div>
-          <h3 class="text-md font-semibold text-gray-700 mb-2">Novo Paciente</h3>
+          <h3 class="text-md font-semibold text-slate-800 mb-2">Novo Paciente</h3>
           <form onsubmit="cadastrarPaciente(event)" class="space-y-3">
-            <input type="text" id="pac-nome" placeholder="Nome Completo" required class="w-full border p-2 rounded text-sm">
-            <input type="text" id="pac-cpf" placeholder="CPF" class="w-full border p-2 rounded text-sm">
-            <input type="tel" id="pac-telefone" placeholder="Telefone" class="w-full border p-2 rounded text-sm">
-            <input type="date" id="pac-nascimento" class="w-full border p-2 rounded text-sm">
-            <button type="submit" class="w-full bg-teal-600 text-white p-2 rounded text-sm hover:bg-teal-700">Cadastrar Paciente</button>
+            <input type="text" id="pac-nome" placeholder="Nome Completo" required class="w-full border p-2 rounded-lg text-sm">
+            <input type="text" id="pac-cpf" placeholder="CPF" class="w-full border p-2 rounded-lg text-sm">
+            <input type="tel" id="pac-telefone" placeholder="Telefone" class="w-full border p-2 rounded-lg text-sm">
+            <input type="date" id="pac-nascimento" class="w-full border p-2 rounded-lg text-sm">
+            <button type="submit" class="w-full bg-teal-600 text-white p-2 rounded-lg text-sm hover:bg-teal-700 font-semibold transition">Cadastrar Paciente</button>
           </form>
         </div>
       </div>
 
-      <!-- COLUNA 2 E 3: REGISTRO DE ATENDIMENTO E HISTÓRICO -->
+      <!-- COLUNA 2 E 3: CONSULTAS -->
       <div class="md:col-span-2 space-y-6">
-        
-        <!-- FORMULÁRIO DE ANAMNESE E CONSULTA -->
-        <div class="bg-white p-5 rounded-lg shadow">
-          <h2 class="text-lg font-bold text-gray-700 mb-2">Novo Atendimento / Sessão</h2>
-          <p id="paciente-selecionado-info" class="text-sm text-teal-600 font-semibold mb-4">Nenhum paciente selecionado</p>
-
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 no-print">
+          <h2 class="text-lg font-bold text-slate-800 mb-2">Novo Atendimento / Sessão</h2>
+          <p id="paciente-selecionado-info" class="text-sm text-teal-700 font-semibold mb-4">Nenhum paciente selecionado</p>
           <form onsubmit="registrarConsulta(event)" class="space-y-4">
             <input type="hidden" id="selected-paciente-id">
             <div>
-              <label class="block text-sm font-medium text-gray-700">Anamnese / Queixa Principal</label>
-              <textarea id="queixa" rows="2" required placeholder="Relato de dores, histórico da lesão..." class="w-full border p-2 rounded text-sm"></textarea>
+              <label class="block text-sm font-medium text-slate-700">Anamnese / Queixa Principal</label>
+              <textarea id="queixa" rows="2" required placeholder="Relato de dores, histórico da lesão..." class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"></textarea>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Diagnóstico Cinesiológico Funcional</label>
-              <textarea id="diagnostico" rows="2" placeholder="Limitação de ADM, fraqueza muscular, postura..." class="w-full border p-2 rounded text-sm"></textarea>
+              <label class="block text-sm font-medium text-slate-700">Diagnóstico Cinesiológico Funcional</label>
+              <textarea id="diagnostico" rows="2" placeholder="Limitação de ADM, fraqueza muscular, postura..." class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"></textarea>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Conduta Terapêutica / Exercícios Aplicados</label>
-              <textarea id="prescricao" rows="2" placeholder="Cinesioterapia, eletroterapia, terapia manual..." class="w-full border p-2 rounded text-sm"></textarea>
+              <label class="block text-sm font-medium text-slate-700">Conduta Terapêutica / Exercícios Aplicados</label>
+              <textarea id="prescricao" rows="2" placeholder="Cinesioterapia, eletroterapia, terapia manual..." class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"></textarea>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Evolução / Observações da Sessão</label>
-              <textarea id="observacoes" rows="2" placeholder="Feedback do paciente pós-sessão..." class="w-full border p-2 rounded text-sm"></textarea>
+              <label class="block text-sm font-medium text-slate-700">Evolução / Observações da Sessão</label>
+              <textarea id="observacoes" rows="2" placeholder="Feedback do paciente pós-sessão..." class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"></textarea>
             </div>
-            <button type="submit" class="bg-teal-700 text-white px-4 py-2 rounded hover:bg-teal-800 font-semibold">Salvar Sessão no Prontuário</button>
+            <button type="submit" class="bg-teal-700 text-white px-5 py-2.5 rounded-lg hover:bg-teal-800 font-semibold transition text-sm">Salvar Sessão no Prontuário</button>
           </form>
         </div>
 
-        <!-- HISTÓRICO DE SESSÕES DO PACIENTE -->
-        <div class="bg-white p-5 rounded-lg shadow">
-          <h2 class="text-lg font-bold text-gray-700 mb-4">Histórico do Prontuário</h2>
-          <div id="historico-consultas" class="space-y-4 max-h-80 overflow-y-auto">
-            <p class="text-sm text-gray-500">Selecione um paciente para carregar o histórico.</p>
+        <div id="area-impressao" class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <div class="flex justify-between items-center mb-4 no-print">
+            <h2 class="text-lg font-bold text-slate-800">Histórico do Prontuário</h2>
+            <button onclick="window.print()" class="text-xs bg-teal-50 text-teal-800 font-semibold px-3 py-1.5 rounded-lg border border-teal-200 hover:bg-teal-100 transition">🖨️ Imprimir / Gerar PDF</button>
+          </div>
+          <div id="historico-consultas" class="space-y-4 max-h-96 overflow-y-auto">
+            <p class="text-sm text-slate-500">Selecione um paciente para carregar o histórico.</p>
           </div>
         </div>
-
       </div>
     </div>
   </div>
 
-  <script>
-    const API_URL = "http://127.0.0.1:3001/api";
-
-    async function fazerLogin(e) {
-      e.preventDefault();
-      const email = document.getElementById("login-email").value;
-      const senha = document.getElementById("login-senha").value;
-
-      const formData = new URLSearchParams();
-      formData.append("username", email);
-      formData.append("password", senha);
-
-      try {
-        const res = await fetch(`${API_URL}/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: formData
-        });
-
-        if (!res.ok) throw new Error("Usuário ou senha incorretos.");
-
-        const data = await res.json();
-        localStorage.setItem("token", data.access_token);
-        iniciarApp();
-      } catch (err) {
-        document.getElementById("login-error").innerText = err.message;
-        document.getElementById("login-error").classList.remove("hidden");
-      }
-    }
-
-    async function iniciarApp() {
-      const token = localStorage.getItem("token");
-      if (!token) return;
-
-      try {
-        const res = await fetch(`${API_URL}/usuarios/me`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-        if (!res.ok) throw new Error();
-        const user = await res.json();
-
-        document.getElementById("user-display").innerText = `${user.nome} (CREFITO: ${user.crefito || 'N/A'})`;
-        document.getElementById("login-screen").classList.add("hidden");
-        document.getElementById("app-screen").classList.remove("hidden");
-
-        carregarPacientes();
-      } catch {
-        logout();
-      }
-    }
-
-    function logout() {
-      localStorage.removeItem("token");
-      document.getElementById("app-screen").classList.add("hidden");
-      document.getElementById("login-screen").classList.remove("hidden");
-    }
-
-    async function carregarPacientes() {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/pacientes`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      const pacientes = await res.json();
-
-      const lista = document.getElementById("lista-pacientes");
-      lista.innerHTML = "";
-      pacientes.forEach(p => {
-        const li = document.createElement("li");
-        li.className = "py-2 cursor-pointer hover:bg-teal-50 px-2 rounded text-sm flex justify-between items-center";
-        li.onclick = () => selecionarPaciente(p);
-        li.innerHTML = `<div><strong>${p.nome}</strong><br><span class="text-xs text-gray-500">${p.cpf || 'Sem CPF'}</span></div>`;
-        lista.appendChild(li);
-      });
-    }
-
-    function selecionarPaciente(paciente) {
-      document.getElementById("selected-paciente-id").value = paciente.id;
-      document.getElementById("paciente-selecionado-info").innerText = `Paciente Ativo: ${paciente.nome}`;
-      carregarHistorico(paciente.id);
-    }
-
-    async function cadastrarPaciente(e) {
-      e.preventDefault();
-      const token = localStorage.getItem("token");
-      const body = {
-        nome: document.getElementById("pac-nome").value,
-        cpf: document.getElementById("pac-cpf").value,
-        telefone: document.getElementById("pac-telefone").value,
-        data_nascimento: document.getElementById("pac-nascimento").value || null,
-        clinica_id: 1
-      };
-
-      await fetch(`${API_URL}/pacientes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify(body)
-      });
-
-      e.target.reset();
-      carregarPacientes();
-    }
-
-    async function registrarConsulta(e) {
-      e.preventDefault();
-      const token = localStorage.getItem("token");
-      const pacienteId = document.getElementById("selected-paciente-id").value;
-
-      if (!pacienteId) {
-        alert("Selecione um paciente na lista primeiro.");
-        return;
-      }
-
-      const body = {
-        paciente_id: parseInt(pacienteId),
-        queixa_principal: document.getElementById("queixa").value,
-        diagnostico: document.getElementById("diagnostico").value,
-        prescricao: document.getElementById("prescricao").value,
-        observacoes: document.getElementById("observacoes").value
-      };
-
-      await fetch(`${API_URL}/consultas`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify(body)
-      });
-
-      e.target.reset();
-      carregarHistorico(pacienteId);
-    }
-
-    async function carregarHistorico(pacienteId) {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_URL}/consultas/paciente/${pacienteId}`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      const consultas = await res.json();
-
-      const container = document.getElementById("historico-consultas");
-      container.innerHTML = "";
-
-      if (consultas.length === 0) {
-        container.innerHTML = "<p class='text-sm text-gray-500'>Nenhuma sessão registrada para este paciente.</p>";
-        return;
-      }
-
-      consultas.forEach(c => {
-        const data = new Date(c.created_at).toLocaleDateString("pt-BR");
-        const div = document.createElement("div");
-        div.className = "border-l-4 border-teal-600 bg-gray-50 p-3 rounded text-sm space-y-1";
-        div.innerHTML = `
-          <div class="text-xs font-bold text-teal-800">Sessão em: ${data}</div>
-          <div><strong>Anamnese:</strong> ${c.queixa_principal}</div>
-          <div><strong>Diagnóstico:</strong> ${c.diagnostico || '-'}</div>
-          <div><strong>Conduta/Exercícios:</strong> ${c.prescricao || '-'}</div>
-          <div><strong>Evolução:</strong> ${c.observacoes || '-'}</div>
-        `;
-        container.appendChild(div);
-      });
-    }
-
-    // Auto-login se o token já existir
-    iniciarApp();
-  </script>
+  <script src="js/api.js"></script>
+  <script src="js/pacientes.js"></script>
+  <script src="js/prontuario.js"></script>
+  <script src="js/auth.js"></script>
 </body>
 </html>
