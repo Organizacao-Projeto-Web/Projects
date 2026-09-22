@@ -62,7 +62,6 @@ def obter_usuario_atual(
     except (JWTError, jwt.PyJWTError):
         raise credentials_exception
 
-    # CORRIGIDO: Utilização da classe UsuarioModel importada
     usuario = db.query(UsuarioModel).filter(UsuarioModel.email == email).first()
     if usuario is None:
         raise credentials_exception
