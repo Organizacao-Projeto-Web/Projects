@@ -6,6 +6,7 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 # Importação única e correta do banco de dados
 from app.core.database import Base, engine, get_db
@@ -166,7 +167,11 @@ def listar_clinicas(db: Session = Depends(get_db)):
     response_model=PacienteResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def criar_paciente(paciente: PacienteCreate, db: Session = Depends(get_db)):
+def criar_paciente(
+    paciente: PacienteCreate,
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),  
+):
     if (
         not db.query(ClinicaModel)
         .filter(ClinicaModel.id == paciente.clinica_id)
@@ -176,17 +181,23 @@ def criar_paciente(paciente: PacienteCreate, db: Session = Depends(get_db)):
             status_code=400, detail="A clínica informada não existe."
         )
 
-    novo_paciente = PacienteModel(
-        nome=paciente.nome,
-        cpf=paciente.cpf,
-        data_nascimento=paciente.data_nascimento,
-        telefone=paciente.telefone,
-        clinica_id=paciente.clinica_id,
-    )
-    db.add(novo_paciente)
-    db.commit()
-    db.refresh(novo_paciente)
-    return novo_paciente
+    try:
+        novo_paciente = PacienteModel(
+            nome=paciente.nome,
+            cpf=paciente.cpf,
+            data_nascimento=paciente.data_nascimento,
+            telefone=paciente.telefone,
+            clinica_id=paciente.clinica_id,
+        )
+        db.add(novo_paciente)
+        db.commit()
+        db.refresh(novo_paciente)
+        return novo_paciente
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400, detail="Já existe um paciente cadastrado com este CPF."
+        )
 
 
 @app.get("/api/pacientes", response_model=List[PacienteResponse])

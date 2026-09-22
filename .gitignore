@@ -7,6 +7,11 @@ env/
 .env
 backend/.env
 
+# Banco de Dados Local
+reab.db
+*.db
+backend/reab.db
+
 # Arquivos Temporários do Python
 __pycache__/
 *.pyc
