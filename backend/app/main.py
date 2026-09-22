@@ -1,10 +1,13 @@
 from typing import List
+import jwt
+from jose import JWTError  # Importado para capturar a exceção do token JWT
+
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
+# Importação única e correta do banco de dados
 from app.core.database import Base, engine, get_db
 from app.core.security import (
     ALGORITHM,
@@ -14,17 +17,19 @@ from app.core.security import (
     verificar_senha,
 )
 
-# Modelos para criação das tabelas no MySQL
+# Modelos para criação das tabelas no Banco de Dados
 from app.models.clinic import ClinicaModel
 from app.models.consultation import ConsultaModel
 from app.models.patient import PacienteModel
 from app.models.user import UsuarioModel
 
+# Schemas
 from app.schemas.clinic import ClinicaCreate, ClinicaResponse
 from app.schemas.consultation import ConsultaCreate, ConsultaResponse
 from app.schemas.patient import PacienteCreate, PacienteResponse
 from app.schemas.user import Token, TokenData, UsuarioCreate, UsuarioResponse
 
+# Criar tabelas na inicialização
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Prontuário Eletrônico API", version="1.0.0")
@@ -45,7 +50,7 @@ def obter_usuario_atual(
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Credenciais inválidas ou token expirado.",
+        detail="Não foi possível validar as credenciais",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
@@ -53,15 +58,11 @@ def obter_usuario_atual(
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
-        token_data = TokenData(email=email)
-    except JWTError:
+    except (JWTError, jwt.PyJWTError):
         raise credentials_exception
 
-    usuario = (
-        db.query(UsuarioModel)
-        .filter(UsuarioModel.email == token_data.email)
-        .first()
-    )
+    # CORRIGIDO: Utilização da classe UsuarioModel importada
+    usuario = db.query(UsuarioModel).filter(UsuarioModel.email == email).first()
     if usuario is None:
         raise credentials_exception
     return usuario
@@ -209,7 +210,6 @@ def registrar_consulta(
     db: Session = Depends(get_db),
     usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
 ):
-    # Verifica se o paciente existe
     paciente = (
         db.query(PacienteModel)
         .filter(PacienteModel.id == consulta.paciente_id)
@@ -222,7 +222,7 @@ def registrar_consulta(
 
     nova_consulta = ConsultaModel(
         paciente_id=consulta.paciente_id,
-        medico_id=usuario_atual.id,  # Vincula o ID do médico autenticado no token
+        medico_id=usuario_atual.id,
         queixa_principal=consulta.queixa_principal,
         diagnostico=consulta.diagnostico,
         prescricao=consulta.prescricao,
@@ -243,7 +243,6 @@ def obter_prontuario_paciente(
     db: Session = Depends(get_db),
     usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
 ):
-    # Retorna o histórico de consultas/prontuário em ordem cronológica reversa
     return (
         db.query(ConsultaModel)
         .filter(ConsultaModel.paciente_id == paciente_id)
