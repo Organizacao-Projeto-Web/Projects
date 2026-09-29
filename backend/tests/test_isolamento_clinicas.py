@@ -1,0 +1,216 @@
+def criar_clinica(client, nome, cnpj):
+    response = client.post(
+        "/api/clinicas",
+        json={
+            "nome": nome,
+            "cnpj": cnpj,
+        },
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+def criar_usuario(client, nome, email, senha, clinica_id):
+    response = client.post(
+        "/api/usuarios",
+        json={
+            "nome": nome,
+            "email": email,
+            "senha": senha,
+            "crefito": "12345-F",
+            "cargo": "fisioterapeuta",
+            "clinica_id": clinica_id,
+        },
+    )
+    assert response.status_code == 201, response.json()
+    return response.json()
+
+
+def autenticar(client, email, senha):
+    response = client.post(
+        "/api/auth/login",
+        data={
+            "username": email,
+            "password": senha,
+        },
+    )
+    assert response.status_code == 200
+
+    token = response.json()["access_token"]
+
+    return {
+        "Authorization": f"Bearer {token}",
+    }
+
+
+def criar_paciente(client, headers, nome, cpf):
+    response = client.post(
+        "/api/pacientes",
+        headers=headers,
+        json={
+            "nome": nome,
+            "cpf": cpf,
+            "data_nascimento": "1990-01-01",
+            "telefone": "11999999999",
+        },
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+def preparar_cenario(client):
+    clinica_a = criar_clinica(
+        client,
+        "Clínica Teste A",
+        "11111111000111",
+    )
+    clinica_b = criar_clinica(
+        client,
+        "Clínica Teste B",
+        "22222222000122",
+    )
+
+    criar_usuario(
+        client,
+        "Fisioterapeuta A",
+        "fisio.a@example.com",
+        "SenhaTeste123!",
+        clinica_a["id"],
+    )
+
+    criar_usuario(
+        client,
+        "Fisioterapeuta B",
+        "fisio.b@example.com",
+        "SenhaTeste123!",
+        clinica_b["id"],
+    )
+
+    headers_a = autenticar(
+        client,
+        "fisio.a@example.com",
+        "SenhaTeste123!",
+    )
+
+    headers_b = autenticar(
+        client,
+        "fisio.b@example.com",
+        "SenhaTeste123!",
+    )
+
+    paciente_a = criar_paciente(
+        client,
+        headers_a,
+        "Paciente Clínica A",
+        "11111111111",
+    )
+
+    paciente_b = criar_paciente(
+        client,
+        headers_b,
+        "Paciente Clínica B",
+        "22222222222",
+    )
+
+    return {
+        "clinica_a": clinica_a,
+        "clinica_b": clinica_b,
+        "headers_a": headers_a,
+        "headers_b": headers_b,
+        "paciente_a": paciente_a,
+        "paciente_b": paciente_b,
+    }
+
+
+def test_isolamento_de_dados_entre_clinicas(client):
+    cenario = preparar_cenario(client)
+
+    clinica_a = cenario["clinica_a"]
+    clinica_b = cenario["clinica_b"]
+    headers_a = cenario["headers_a"]
+    headers_b = cenario["headers_b"]
+    paciente_a = cenario["paciente_a"]
+    paciente_b = cenario["paciente_b"]
+
+    # Cadastro deve usar a clínica do usuário autenticado.
+    assert paciente_a["clinica_id"] == clinica_a["id"]
+    assert paciente_b["clinica_id"] == clinica_b["id"]
+
+    # Clínica A deve listar somente seus próprios pacientes.
+    response = client.get(
+        "/api/pacientes",
+        headers=headers_a,
+    )
+
+    assert response.status_code == 200
+
+    pacientes_visiveis = response.json()
+
+    ids_visiveis = {
+        paciente["id"]
+        for paciente in pacientes_visiveis
+    }
+
+    assert paciente_a["id"] in ids_visiveis
+    assert paciente_b["id"] not in ids_visiveis
+
+    assert all(
+        paciente["clinica_id"] == clinica_a["id"]
+        for paciente in pacientes_visiveis
+    )
+
+    # Clínica A não pode consultar prontuário de paciente da Clínica B.
+    response = client.get(
+        f"/api/consultas/paciente/{paciente_b['id']}",
+        headers=headers_a,
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Paciente não encontrado."
+    }
+
+    # Clínica A não pode registrar consulta para paciente da Clínica B.
+    response = client.post(
+        "/api/consultas",
+        headers=headers_a,
+        json={
+            "paciente_id": paciente_b["id"],
+            "queixa_principal": "Tentativa de acesso cruzado",
+            "diagnostico": "Teste",
+            "prescricao": "Teste",
+            "observacoes": "Teste automatizado",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Paciente não encontrado."
+    }
+
+    # O acesso legítimo da Clínica A deve continuar funcionando.
+    response = client.post(
+        "/api/consultas",
+        headers=headers_a,
+        json={
+            "paciente_id": paciente_a["id"],
+            "queixa_principal": "Dor no joelho",
+            "diagnostico": "Teste",
+            "prescricao": "Teste",
+            "observacoes": "Teste automatizado",
+        },
+    )
+
+    assert response.status_code == 201
+
+    consulta = response.json()
+
+    assert consulta["paciente_id"] == paciente_a["id"]
+
+    # Clínica B continua podendo acessar seu próprio prontuário.
+    response = client.get(
+        f"/api/consultas/paciente/{paciente_b['id']}",
+        headers=headers_b,
+    )
+
+    assert response.status_code == 200

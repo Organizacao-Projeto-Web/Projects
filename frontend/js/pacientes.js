@@ -48,8 +48,7 @@ async function cadastrarPaciente(e) {
     nome: document.getElementById("pac-nome").value,
     cpf: document.getElementById("pac-cpf").value,
     telefone: document.getElementById("pac-telefone").value,
-    data_nascimento: document.getElementById("pac-nascimento").value || null,
-    clinica_id: 1
+    data_nascimento: document.getElementById("pac-nascimento").value || null
   };
 
   await fetch(`${API_URL}/pacientes`, {

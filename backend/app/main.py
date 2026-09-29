@@ -169,24 +169,15 @@ def listar_clinicas(db: Session = Depends(get_db)):
 def criar_paciente(
     paciente: PacienteCreate,
     db: Session = Depends(get_db),
-    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),  
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
 ):
-    if (
-        not db.query(ClinicaModel)
-        .filter(ClinicaModel.id == paciente.clinica_id)
-        .first()
-    ):
-        raise HTTPException(
-            status_code=400, detail="A clínica informada não existe."
-        )
-
     try:
         novo_paciente = PacienteModel(
             nome=paciente.nome,
             cpf=paciente.cpf,
             data_nascimento=paciente.data_nascimento,
             telefone=paciente.telefone,
-            clinica_id=paciente.clinica_id,
+            clinica_id=usuario_atual.clinica_id,
         )
         db.add(novo_paciente)
         db.commit()
@@ -195,7 +186,8 @@ def criar_paciente(
     except IntegrityError:
         db.rollback()
         raise HTTPException(
-            status_code=400, detail="Já existe um paciente cadastrado com este CPF."
+            status_code=400,
+            detail="Já existe um paciente cadastrado com este CPF.",
         )
 
 
@@ -204,8 +196,11 @@ def listar_pacientes(
     db: Session = Depends(get_db),
     usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
 ):
-    return db.query(PacienteModel).all()
-
+    return (
+        db.query(PacienteModel)
+        .filter(PacienteModel.clinica_id == usuario_atual.clinica_id)
+        .all()
+    )
 
 # ==================== CONSULTAS E PRONTUÁRIO ====================
 
@@ -222,27 +217,33 @@ def registrar_consulta(
 ):
     paciente = (
         db.query(PacienteModel)
-        .filter(PacienteModel.id == consulta.paciente_id)
+        .filter(
+            PacienteModel.id == consulta.paciente_id,
+            PacienteModel.clinica_id == usuario_atual.clinica_id,
+        )
         .first()
     )
+
     if not paciente:
         raise HTTPException(
-            status_code=404, detail="Paciente não encontrado."
+            status_code=404,
+            detail="Paciente não encontrado.",
         )
 
     nova_consulta = ConsultaModel(
-        paciente_id=consulta.paciente_id,
+        paciente_id=paciente.id,
         medico_id=usuario_atual.id,
         queixa_principal=consulta.queixa_principal,
         diagnostico=consulta.diagnostico,
         prescricao=consulta.prescricao,
         observacoes=consulta.observacoes,
     )
+
     db.add(nova_consulta)
     db.commit()
     db.refresh(nova_consulta)
-    return nova_consulta
 
+    return nova_consulta
 
 @app.get(
     "/api/consultas/paciente/{paciente_id}",
@@ -253,9 +254,24 @@ def obter_prontuario_paciente(
     db: Session = Depends(get_db),
     usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
 ):
+    paciente = (
+        db.query(PacienteModel)
+        .filter(
+            PacienteModel.id == paciente_id,
+            PacienteModel.clinica_id == usuario_atual.clinica_id,
+        )
+        .first()
+    )
+
+    if not paciente:
+        raise HTTPException(
+            status_code=404,
+            detail="Paciente não encontrado.",
+        )
+
     return (
         db.query(ConsultaModel)
-        .filter(ConsultaModel.paciente_id == paciente_id)
+        .filter(ConsultaModel.paciente_id == paciente.id)
         .order_by(ConsultaModel.created_at.desc())
         .all()
     )
