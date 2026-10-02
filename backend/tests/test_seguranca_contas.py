@@ -260,3 +260,14 @@ def test_usuario_inativo_com_token_existente_nao_pode_acessar_sistema(
     )
 
     assert response.status_code == 401
+
+def test_nao_permite_criar_clinica_diretamente(client):
+    response = client.post(
+        "/api/clinicas",
+        json={
+            "nome": "Clínica Órfã",
+            "cnpj": "77777777000177",
+        },
+    )
+
+    assert response.status_code == 405

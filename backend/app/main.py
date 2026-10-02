@@ -230,20 +230,6 @@ def obter_meu_perfil(usuario_atual: UsuarioModel = Depends(obter_usuario_atual))
 
 # ==================== CLÍNICAS ====================
 
-
-@app.post(
-    "/api/clinicas",
-    response_model=ClinicaResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def criar_clinica(clinica: ClinicaCreate, db: Session = Depends(get_db)):
-    nova_clinica = ClinicaModel(nome=clinica.nome, cnpj=clinica.cnpj)
-    db.add(nova_clinica)
-    db.commit()
-    db.refresh(nova_clinica)
-    return nova_clinica
-
-
 @app.get("/api/clinicas", response_model=List[ClinicaResponse])
 def listar_clinicas(db: Session = Depends(get_db)):
     return db.query(ClinicaModel).all()
