@@ -25,7 +25,6 @@ from app.models.patient import PacienteModel
 from app.models.user import UsuarioModel
 
 # Schemas
-from app.schemas.clinic import ClinicaCreate, ClinicaResponse
 from app.schemas.consultation import ConsultaCreate, ConsultaResponse
 from app.schemas.patient import PacienteCreate, PacienteResponse
 from app.schemas.user import (
@@ -229,10 +228,6 @@ def obter_meu_perfil(usuario_atual: UsuarioModel = Depends(obter_usuario_atual))
 
 
 # ==================== CLÍNICAS ====================
-
-@app.get("/api/clinicas", response_model=List[ClinicaResponse])
-def listar_clinicas(db: Session = Depends(get_db)):
-    return db.query(ClinicaModel).all()
 
 
 # ==================== PACIENTES ====================
