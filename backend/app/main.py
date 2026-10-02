@@ -54,24 +54,34 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
 def obter_usuario_atual(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Não foi possível validar as credenciais",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
+
         if email is None:
             raise credentials_exception
+
     except (JWTError, jwt.PyJWTError):
         raise credentials_exception
 
-    usuario = db.query(UsuarioModel).filter(UsuarioModel.email == email).first()
-    if usuario is None:
+    usuario = (
+        db.query(UsuarioModel)
+        .filter(UsuarioModel.email == email)
+        .first()
+    )
+
+    if usuario is None or not usuario.ativo:
         raise credentials_exception
+
     return usuario
 
 

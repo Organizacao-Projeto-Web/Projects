@@ -187,3 +187,76 @@ def test_usuario_nao_pode_criar_usuario_em_outra_clinica(client):
     )
 
     assert response.status_code == 422
+
+def test_usuario_inativo_com_token_existente_nao_pode_acessar_sistema(
+    client,
+    app_context,
+):
+    _, TestSessionLocal = app_context
+
+    cadastro = client.post(
+        "/api/cadastro",
+        json={
+            "clinica": {
+                "nome": "Clínica Token Revogado",
+                "cnpj": "66666666000166",
+            },
+            "responsavel": {
+                "nome": "Fisioterapeuta Token Revogado",
+                "email": "token.revogado@example.com",
+                "senha": "SenhaTeste123!",
+                "crefito": "22222-F",
+            },
+        },
+    )
+
+    assert cadastro.status_code == 201
+
+    login = client.post(
+        "/api/auth/login",
+        data={
+            "username": "token.revogado@example.com",
+            "password": "SenhaTeste123!",
+        },
+    )
+
+    assert login.status_code == 200
+
+    token = login.json()["access_token"]
+
+    # Confirma que o token funciona antes da desativação.
+    perfil = client.get(
+        "/api/usuarios/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert perfil.status_code == 200
+
+    from app.models.user import UsuarioModel
+
+    db = TestSessionLocal()
+
+    try:
+        usuario = (
+            db.query(UsuarioModel)
+            .filter(
+                UsuarioModel.email == "token.revogado@example.com"
+            )
+            .first()
+        )
+
+        assert usuario is not None
+
+        usuario.ativo = False
+        db.commit()
+    finally:
+        db.close()
+
+    # O mesmo token não pode continuar funcionando
+    # depois que a conta for desativada.
+    response = client.get(
+        "/api/usuarios/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
