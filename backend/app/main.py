@@ -28,7 +28,14 @@ from app.models.user import UsuarioModel
 from app.schemas.clinic import ClinicaCreate, ClinicaResponse
 from app.schemas.consultation import ConsultaCreate, ConsultaResponse
 from app.schemas.patient import PacienteCreate, PacienteResponse
-from app.schemas.user import Token, TokenData, UsuarioCreate, UsuarioResponse
+from app.schemas.user import (
+    PrimeiroCadastro,
+    PrimeiroCadastroResponse,
+    Token,
+    TokenData,
+    UsuarioCreate,
+    UsuarioResponse,
+)
 
 # Criar tabelas na inicialização
 Base.metadata.create_all(bind=engine)
@@ -77,26 +84,83 @@ def home():
 
 
 @app.post(
+    "/api/cadastro",
+    response_model=PrimeiroCadastroResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def primeiro_cadastro(
+    cadastro: PrimeiroCadastro,
+    db: Session = Depends(get_db),
+):
+    if (
+        db.query(UsuarioModel)
+        .filter(UsuarioModel.email == cadastro.responsavel.email)
+        .first()
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="E-mail já cadastrado no sistema.",
+        )
+
+    try:
+        nova_clinica = ClinicaModel(
+            nome=cadastro.clinica.nome,
+            cnpj=cadastro.clinica.cnpj,
+        )
+        db.add(nova_clinica)
+
+        # Obtém o ID da clínica sem confirmar a transação.
+        db.flush()
+
+        novo_responsavel = UsuarioModel(
+            nome=cadastro.responsavel.nome,
+            email=cadastro.responsavel.email,
+            senha_hash=gerar_hash_senha(cadastro.responsavel.senha),
+            crefito=cadastro.responsavel.crefito,
+            cargo="fisioterapeuta",
+            clinica_id=nova_clinica.id,
+        )
+
+        db.add(novo_responsavel)
+
+        # Clínica e responsável são gravados juntos.
+        db.commit()
+
+        db.refresh(nova_clinica)
+        db.refresh(novo_responsavel)
+
+        return {
+            "clinica": nova_clinica,
+            "responsavel": novo_responsavel,
+        }
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Não foi possível concluir o cadastro.",
+        )
+
+
+@app.post(
     "/api/usuarios",
     response_model=UsuarioResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def criar_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db)):
+def criar_usuario(
+    usuario: UsuarioCreate,
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
     if (
         db.query(UsuarioModel)
         .filter(UsuarioModel.email == usuario.email)
         .first()
     ):
         raise HTTPException(
-            status_code=400, detail="E-mail já cadastrado no sistema."
+            status_code=400,
+            detail="E-mail já cadastrado no sistema.",
         )
-
-    if (
-        not db.query(ClinicaModel)
-        .filter(ClinicaModel.id == usuario.clinica_id)
-        .first()
-    ):
-        raise HTTPException(status_code=400, detail="Clínica informada não existe.")
 
     novo_usuario = UsuarioModel(
         nome=usuario.nome,
@@ -104,13 +168,14 @@ def criar_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db)):
         senha_hash=gerar_hash_senha(usuario.senha),
         crefito=usuario.crefito,
         cargo=usuario.cargo,
-        clinica_id=usuario.clinica_id,
+        clinica_id=usuario_atual.clinica_id,
     )
+
     db.add(novo_usuario)
     db.commit()
     db.refresh(novo_usuario)
-    return novo_usuario
 
+    return novo_usuario
 
 @app.post("/api/auth/login", response_model=Token)
 def login(
@@ -122,14 +187,30 @@ def login(
         .filter(UsuarioModel.email == form_data.username)
         .first()
     )
-    if not usuario or not verificar_senha(form_data.password, usuario.senha_hash):
+
+    if not usuario or not verificar_senha(
+        form_data.password,
+        usuario.senha_hash,
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-mail ou senha incorretos.",
         )
 
-    access_token = criar_token_acesso(data={"sub": usuario.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+    if not usuario.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuário inativo.",
+        )
+
+    access_token = criar_token_acesso(
+        data={"sub": usuario.email}
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+    }
 
 
 @app.get("/api/usuarios/me", response_model=UsuarioResponse)
