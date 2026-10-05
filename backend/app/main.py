@@ -126,7 +126,7 @@ def primeiro_cadastro(
             email=cadastro.responsavel.email,
             senha_hash=gerar_hash_senha(cadastro.responsavel.senha),
             crefito=cadastro.responsavel.crefito,
-            cargo="fisioterapeuta",
+            cargo="admin",
             clinica_id=nova_clinica.id,
         )
 
@@ -161,6 +161,18 @@ def criar_usuario(
     db: Session = Depends(get_db),
     usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
 ):
+    if usuario_atual.cargo != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas administradores podem criar usuários.",
+        )
+
+    if usuario.cargo == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Não é permitido criar outro administrador.",
+        )
+
     if (
         db.query(UsuarioModel)
         .filter(UsuarioModel.email == usuario.email)

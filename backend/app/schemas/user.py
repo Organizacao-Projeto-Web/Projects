@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
@@ -10,7 +10,7 @@ class UsuarioBase(BaseModel):
     nome: str
     email: EmailStr
     crefito: Optional[str] = None
-    cargo: Optional[str] = "fisioterapeuta"
+    cargo: Literal["fisioterapeuta", "admin", "recepcao"] = "fisioterapeuta"
 
 class UsuarioCreate(UsuarioBase):
     model_config = ConfigDict(extra="forbid")

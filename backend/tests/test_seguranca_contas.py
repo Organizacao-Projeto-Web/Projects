@@ -275,3 +275,75 @@ def test_nao_permite_acesso_direto_a_clinicas(client):
     response_get = client.get("/api/clinicas")
 
     assert response_get.status_code == 404
+
+def test_fisioterapeuta_nao_pode_criar_outro_usuario(client):
+    cadastro = client.post(
+        "/api/cadastro",
+        json={
+            "clinica": {
+                "nome": "Clínica Permissões",
+                "cnpj": "88888888000188",
+            },
+            "responsavel": {
+                "nome": "Administrador",
+                "email": "admin.permissoes@example.com",
+                "senha": "SenhaTeste123!",
+                "crefito": "33333-F",
+            },
+        },
+    )
+
+    assert cadastro.status_code == 201
+
+    login_admin = client.post(
+        "/api/auth/login",
+        data={
+            "username": "admin.permissoes@example.com",
+            "password": "SenhaTeste123!",
+        },
+    )
+
+    assert login_admin.status_code == 200
+    token_admin = login_admin.json()["access_token"]
+
+    criar_fisio = client.post(
+        "/api/usuarios",
+        headers={"Authorization": f"Bearer {token_admin}"},
+        json={
+            "nome": "Fisioterapeuta Comum",
+            "email": "fisio.comum@example.com",
+            "senha": "SenhaTeste123!",
+            "crefito": "44444-F",
+            "cargo": "fisioterapeuta",
+        },
+    )
+
+    assert criar_fisio.status_code == 201
+
+    login_fisio = client.post(
+        "/api/auth/login",
+        data={
+            "username": "fisio.comum@example.com",
+            "password": "SenhaTeste123!",
+        },
+    )
+
+    assert login_fisio.status_code == 200
+    token_fisio = login_fisio.json()["access_token"]
+
+    response = client.post(
+        "/api/usuarios",
+        headers={"Authorization": f"Bearer {token_fisio}"},
+        json={
+            "nome": "Usuário Indevido",
+            "email": "usuario.indevido@example.com",
+            "senha": "SenhaTeste123!",
+            "crefito": "55555-F",
+            "cargo": "fisioterapeuta",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Apenas administradores podem criar usuários."
+    }
