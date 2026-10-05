@@ -207,3 +207,33 @@ def test_isolamento_de_dados_entre_clinicas(client):
     )
 
     assert response.status_code == 200
+
+def test_endpoints_clinicos_exigem_autenticacao(client):
+    response = client.post(
+        "/api/pacientes",
+        json={
+            "nome": "Paciente Sem Autenticação",
+            "cpf": "33333333333",
+            "data_nascimento": "1990-01-01",
+            "telefone": "11999999999",
+        },
+    )
+    assert response.status_code == 401
+
+    response = client.get("/api/pacientes")
+    assert response.status_code == 401
+
+    response = client.post(
+        "/api/consultas",
+        json={
+            "paciente_id": 1,
+            "queixa_principal": "Teste",
+            "diagnostico": "Teste",
+            "prescricao": "Teste",
+            "observacoes": "Teste",
+        },
+    )
+    assert response.status_code == 401
+
+    response = client.get("/api/consultas/paciente/1")
+    assert response.status_code == 401
