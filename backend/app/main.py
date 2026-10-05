@@ -111,6 +111,16 @@ def primeiro_cadastro(
             detail="E-mail já cadastrado no sistema.",
         )
 
+    if (
+        db.query(ClinicaModel)
+        .filter(ClinicaModel.cnpj == cadastro.clinica.cnpj)
+        .first()
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="CNPJ já cadastrado no sistema.",
+        )
+
     try:
         nova_clinica = ClinicaModel(
             nome=cadastro.clinica.nome,
@@ -149,7 +159,6 @@ def primeiro_cadastro(
             status_code=400,
             detail="Não foi possível concluir o cadastro.",
         )
-
 
 @app.post(
     "/api/usuarios",
@@ -192,9 +201,17 @@ def criar_usuario(
         clinica_id=usuario_atual.clinica_id,
     )
 
-    db.add(novo_usuario)
-    db.commit()
-    db.refresh(novo_usuario)
+    try:
+        db.add(novo_usuario)
+        db.commit()
+        db.refresh(novo_usuario)
+        return novo_usuario
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Não foi possível criar o usuário.",
+        )
 
     return novo_usuario
 

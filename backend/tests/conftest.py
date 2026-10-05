@@ -106,6 +106,17 @@ def app_context(test_engine):
     # Limpa exclusivamente o banco de testes ao final da sessão.
     Base.metadata.drop_all(bind=test_engine)
 
+@pytest.fixture(autouse=True)
+def limpar_banco_entre_testes(app_context, test_engine):
+    from app.core.database import Base
+
+    # ATENÇÃO:
+    # Limpeza executada exclusivamente em projeto_extensionistadb_test,
+    # protegido pelas travas do fixture test_engine.
+    Base.metadata.drop_all(bind=test_engine)
+    Base.metadata.create_all(bind=test_engine)
+
+    yield
 
 @pytest.fixture()
 def client(app_context):

@@ -1,23 +1,19 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
-# Dados comuns para Clínica
 class ClinicaBase(BaseModel):
-    nome: str
-    cnpj: Optional[str] = None
+    nome: str = Field(min_length=2, max_length=150)
+    cnpj: str = Field(pattern=r"^\d{14}$")
 
 
-# Schema recebido no POST (envio de dados para criar)
 class ClinicaCreate(ClinicaBase):
     pass
 
 
-# Schema retornado nas respostas (saída)
 class ClinicaResponse(ClinicaBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     created_at: datetime
-
-    class Config:
-        from_attributes = True

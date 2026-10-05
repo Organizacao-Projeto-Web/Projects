@@ -210,7 +210,7 @@ def test_usuario_inativo_com_token_existente_nao_pode_acessar_sistema(
         },
     )
 
-    assert cadastro.status_code == 201
+    assert cadastro.status_code == 201, cadastro.json()
 
     login = client.post(
         "/api/auth/login",
