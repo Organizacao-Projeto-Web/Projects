@@ -213,8 +213,6 @@ def criar_usuario(
             detail="Não foi possível criar o usuário.",
         )
 
-    return novo_usuario
-
 @app.post("/api/auth/login", response_model=Token)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),

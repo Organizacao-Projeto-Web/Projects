@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
@@ -14,7 +14,10 @@ class PacienteModel(Base):
     data_nascimento = Column(Date, nullable=True)
     telefone = Column(String(20), nullable=True)
     clinica_id = Column(Integer, ForeignKey("clinicas.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+    )
 
     # Relacionamento para acessar os dados da clínica a partir do paciente
     clinica = relationship("ClinicaModel")

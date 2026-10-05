@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+
+from pydantic import BaseModel, ConfigDict
 
 
 class ConsultaBase(BaseModel):
@@ -16,9 +17,8 @@ class ConsultaCreate(ConsultaBase):
 
 
 class ConsultaResponse(ConsultaBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     medico_id: int
     created_at: datetime
-
-    class Config:
-        from_attributes = True
