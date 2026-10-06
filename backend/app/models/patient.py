@@ -10,7 +10,7 @@ class PacienteModel(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     nome = Column(String(255), nullable=False)
-    cpf = Column(String(14), unique=True, index=True, nullable=True)
+    cpf = Column(String(11), unique=True, index=True, nullable=True)
     data_nascimento = Column(Date, nullable=True)
     telefone = Column(String(20), nullable=True)
     clinica_id = Column(Integer, ForeignKey("clinicas.id"), nullable=False)
