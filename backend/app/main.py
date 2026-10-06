@@ -314,6 +314,12 @@ def registrar_consulta(
     db: Session = Depends(get_db),
     usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
 ):
+    if usuario_atual.cargo == "recepcao":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A recepção não pode registrar consultas.",
+        )
+
     paciente = (
         db.query(PacienteModel)
         .filter(
@@ -353,6 +359,12 @@ def obter_prontuario_paciente(
     db: Session = Depends(get_db),
     usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
 ):
+    if usuario_atual.cargo == "recepcao":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A recepção não pode acessar prontuários.",
+        )
+
     paciente = (
         db.query(PacienteModel)
         .filter(

@@ -347,3 +347,105 @@ def test_fisioterapeuta_nao_pode_criar_outro_usuario(client):
     assert response.json() == {
         "detail": "Apenas administradores podem criar usuários."
     }
+
+def test_recepcao_nao_pode_acessar_prontuario_nem_registrar_consulta(client):
+    cadastro = client.post(
+        "/api/cadastro",
+        json={
+            "clinica": {
+                "nome": "Clínica Recepção",
+                "cnpj": "99999999000199",
+            },
+            "responsavel": {
+                "nome": "Administrador Recepção",
+                "email": "admin.recepcao@example.com",
+                "senha": "SenhaTeste123!",
+                "crefito": "66666-F",
+            },
+        },
+    )
+
+    assert cadastro.status_code == 201
+
+    login_admin = client.post(
+        "/api/auth/login",
+        data={
+            "username": "admin.recepcao@example.com",
+            "password": "SenhaTeste123!",
+        },
+    )
+
+    assert login_admin.status_code == 200
+
+    token_admin = login_admin.json()["access_token"]
+
+    headers_admin = {
+        "Authorization": f"Bearer {token_admin}"
+    }
+
+    criar_recepcao = client.post(
+        "/api/usuarios",
+        headers=headers_admin,
+        json={
+            "nome": "Recepcionista",
+            "email": "recepcao@example.com",
+            "senha": "SenhaTeste123!",
+            "crefito": "REC-001",
+            "cargo": "recepcao",
+        },
+    )
+
+    assert criar_recepcao.status_code == 201
+
+    paciente = client.post(
+        "/api/pacientes",
+        headers=headers_admin,
+        json={
+            "nome": "Paciente Teste Recepção",
+            "cpf": "12345678901",
+        },
+    )
+
+    assert paciente.status_code == 201
+
+    paciente_id = paciente.json()["id"]
+
+    login_recepcao = client.post(
+        "/api/auth/login",
+        data={
+            "username": "recepcao@example.com",
+            "password": "SenhaTeste123!",
+        },
+    )
+
+    assert login_recepcao.status_code == 200
+
+    token_recepcao = login_recepcao.json()["access_token"]
+
+    headers_recepcao = {
+        "Authorization": f"Bearer {token_recepcao}"
+    }
+
+    registrar = client.post(
+        "/api/consultas",
+        headers=headers_recepcao,
+        json={
+            "paciente_id": paciente_id,
+            "queixa_principal": "Dor no joelho",
+        },
+    )
+
+    assert registrar.status_code == 403
+    assert registrar.json() == {
+        "detail": "A recepção não pode registrar consultas."
+    }
+
+    prontuario = client.get(
+        f"/api/consultas/paciente/{paciente_id}",
+        headers=headers_recepcao,
+    )
+
+    assert prontuario.status_code == 403
+    assert prontuario.json() == {
+        "detail": "A recepção não pode acessar prontuários."
+    }
