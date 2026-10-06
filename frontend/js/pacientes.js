@@ -2,11 +2,29 @@ let todosPacientes = [];
 
 async function carregarPacientes() {
   const token = localStorage.getItem("token");
-  const res = await fetch(`${API_URL}/pacientes`, {
-    headers: { "Authorization": `Bearer ${token}` }
-  });
-  todosPacientes = await res.json();
-  renderizarListaPacientes(todosPacientes);
+
+  try {
+    const res = await fetch(`${API_URL}/pacientes`, {
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        logout();
+        return;
+      }
+
+      throw new Error("Não foi possível carregar os pacientes.");
+    }
+
+    todosPacientes = await res.json();
+    renderizarListaPacientes(todosPacientes);
+
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 function renderizarListaPacientes(pacientes) {
@@ -29,7 +47,7 @@ function renderizarListaPacientes(pacientes) {
 
 function filtrarPacientes() {
   const termo = document.getElementById("busca-paciente").value.toLowerCase();
-  const filtrados = todosPacientes.filter(p => 
+  const filtrados = todosPacientes.filter(p =>
     p.nome.toLowerCase().includes(termo) || (p.cpf && p.cpf.includes(termo))
   );
   renderizarListaPacientes(filtrados);
@@ -43,20 +61,45 @@ function selecionarPaciente(paciente) {
 
 async function cadastrarPaciente(e) {
   e.preventDefault();
+
   const token = localStorage.getItem("token");
+
   const body = {
     nome: document.getElementById("pac-nome").value,
-    cpf: document.getElementById("pac-cpf").value,
-    telefone: document.getElementById("pac-telefone").value,
+    cpf: document.getElementById("pac-cpf").value || null,
+    telefone: document.getElementById("pac-telefone").value || null,
     data_nascimento: document.getElementById("pac-nascimento").value || null
   };
 
-  await fetch(`${API_URL}/pacientes`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-    body: JSON.stringify(body)
-  });
+  try {
+    const res = await fetch(`${API_URL}/pacientes`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(body)
+    });
 
-  e.target.reset();
-  carregarPacientes();
+    if (!res.ok) {
+      if (res.status === 401) {
+        logout();
+        return;
+      }
+
+      const erro = await res.json();
+
+      throw new Error(
+        typeof erro.detail === "string"
+          ? erro.detail
+          : "Não foi possível cadastrar o paciente."
+      );
+    }
+
+    e.target.reset();
+    await carregarPacientes();
+
+  } catch (err) {
+    alert(err.message);
+  }
 }

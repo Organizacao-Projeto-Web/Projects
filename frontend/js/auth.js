@@ -53,36 +53,54 @@ async function fazerLogin(e) {
   }
 }
 
-async function cadastrarFisioterapeuta(e) {
+async function cadastrarClinica(e) {
   e.preventDefault();
   limparMensagens();
 
   const body = {
-    nome: document.getElementById("reg-nome").value,
-    crefito: document.getElementById("reg-crefito").value,
-    email: document.getElementById("reg-email").value,
-    senha: document.getElementById("reg-senha").value
+    clinica: {
+      nome: document.getElementById("reg-clinica-nome").value.trim(),
+      cnpj: document.getElementById("reg-cnpj").value.trim()
+    },
+    responsavel: {
+      nome: document.getElementById("reg-nome").value.trim(),
+      crefito: document.getElementById("reg-crefito").value.trim(),
+      email: document.getElementById("reg-email").value.trim(),
+      senha: document.getElementById("reg-senha").value
+    }
   };
 
   try {
-    const res = await fetch(`${API_URL}/usuarios`, {
+    const res = await fetch(`${API_URL}/cadastro`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify(body)
     });
 
     if (!res.ok) {
       const errData = await res.json();
-      throw new Error(errData.detail || "Erro ao cadastrar conta.");
+
+      let mensagem = "Erro ao realizar cadastro.";
+
+      if (typeof errData.detail === "string") {
+        mensagem = errData.detail;
+      }
+
+      throw new Error(mensagem);
     }
 
-    document.getElementById("auth-success").innerText = "Conta criada com sucesso! Faça login para entrar.";
+    document.getElementById("auth-success").innerText =
+      "Clínica e conta criadas com sucesso! Faça login para entrar.";
+
     document.getElementById("auth-success").classList.remove("hidden");
-    
+
+    document.getElementById("register-form").reset();
+
     setTimeout(() => {
       alternarTelaAuth();
     }, 1500);
-
   } catch (err) {
     document.getElementById("auth-error").innerText = err.message;
     document.getElementById("auth-error").classList.remove("hidden");
