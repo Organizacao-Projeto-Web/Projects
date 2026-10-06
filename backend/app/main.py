@@ -72,11 +72,7 @@ def obter_usuario_atual(
     except (JWTError, jwt.PyJWTError):
         raise credentials_exception
 
-    usuario = (
-        db.query(UsuarioModel)
-        .filter(UsuarioModel.email == email)
-        .first()
-    )
+    usuario = db.query(UsuarioModel).filter(UsuarioModel.email == email).first()
 
     if usuario is None or not usuario.ativo:
         raise credentials_exception
@@ -160,6 +156,7 @@ def primeiro_cadastro(
             detail="Não foi possível concluir o cadastro.",
         )
 
+
 @app.post(
     "/api/usuarios",
     response_model=UsuarioResponse,
@@ -182,11 +179,7 @@ def criar_usuario(
             detail="Não é permitido criar outro administrador.",
         )
 
-    if (
-        db.query(UsuarioModel)
-        .filter(UsuarioModel.email == usuario.email)
-        .first()
-    ):
+    if db.query(UsuarioModel).filter(UsuarioModel.email == usuario.email).first():
         raise HTTPException(
             status_code=400,
             detail="E-mail já cadastrado no sistema.",
@@ -213,15 +206,14 @@ def criar_usuario(
             detail="Não foi possível criar o usuário.",
         )
 
+
 @app.post("/api/auth/login", response_model=Token)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
     usuario = (
-        db.query(UsuarioModel)
-        .filter(UsuarioModel.email == form_data.username)
-        .first()
+        db.query(UsuarioModel).filter(UsuarioModel.email == form_data.username).first()
     )
 
     if not usuario or not verificar_senha(
@@ -239,9 +231,7 @@ def login(
             detail="Usuário inativo.",
         )
 
-    access_token = criar_token_acesso(
-        data={"sub": usuario.email}
-    )
+    access_token = criar_token_acesso(data={"sub": usuario.email})
 
     return {
         "access_token": access_token,
@@ -301,6 +291,7 @@ def listar_pacientes(
         .all()
     )
 
+
 # ==================== CONSULTAS E PRONTUÁRIO ====================
 
 
@@ -344,11 +335,20 @@ def registrar_consulta(
         observacoes=consulta.observacoes,
     )
 
-    db.add(nova_consulta)
-    db.commit()
-    db.refresh(nova_consulta)
+    try:
+        db.add(nova_consulta)
+        db.commit()
+        db.refresh(nova_consulta)
+        return nova_consulta
+    except IntegrityError:
+        db.rollback()
+    raise HTTPException(
+        status_code=400,
+        detail="Não foi possível registrar a consulta.",
+    )
 
     return nova_consulta
+
 
 @app.get(
     "/api/consultas/paciente/{paciente_id}",
