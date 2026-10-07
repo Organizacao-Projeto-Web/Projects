@@ -123,6 +123,7 @@ async function iniciarApp() {
     document.getElementById("app-screen").classList.remove("hidden");
 
     carregarPacientes();
+    carregarDadosAgenda();
   } catch {
     logout();
   }
