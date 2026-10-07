@@ -37,3 +37,4 @@ websockets==17.1
 # Testes
 pytest==9.1.1
 httpx==0.28.1
+alembic==1.20.0

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
@@ -12,10 +12,16 @@ class UsuarioModel(Base):
     nome = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
     senha_hash = Column(String(255), nullable=False)
-    crefito = Column(String(20), nullable=True)
-    cargo = Column(String(50), default="medico")  # medico, recepcao, admin
+    crefito = Column(String(30), nullable=True)
+    cargo = Column(
+        String(50),
+        default="fisioterapeuta",
+    )  # fisioterapeuta, recepcao, admin
     ativo = Column(Boolean, default=True)
     clinica_id = Column(Integer, ForeignKey("clinicas.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+    )
 
     clinica = relationship("ClinicaModel")

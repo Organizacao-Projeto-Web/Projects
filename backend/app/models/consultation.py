@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text
 from sqlalchemy.orm import relationship
 
@@ -15,7 +15,10 @@ class ConsultaModel(Base):
     diagnostico = Column(Text, nullable=True)
     prescricao = Column(Text, nullable=True)
     observacoes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+    )
 
     paciente = relationship("PacienteModel")
     medico = relationship("UsuarioModel")

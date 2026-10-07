@@ -1,0 +1,451 @@
+def test_primeiro_cadastro_cria_clinica_e_responsavel(client):
+    response = client.post(
+        "/api/cadastro",
+        json={
+            "clinica": {
+                "nome": "Clínica Primeiro Acesso",
+                "cnpj": "33333333000133",
+            },
+            "responsavel": {
+                "nome": "Fisioterapeuta Responsável",
+                "email": "responsavel@example.com",
+                "senha": "SenhaTeste123!",
+                "crefito": "12345-F",
+            },
+        },
+    )
+
+    assert response.status_code == 201
+
+    dados = response.json()
+
+    assert dados["clinica"]["nome"] == "Clínica Primeiro Acesso"
+    assert dados["responsavel"]["nome"] == "Fisioterapeuta Responsável"
+    assert dados["responsavel"]["email"] == "responsavel@example.com"
+
+    # O backend deve definir a associação com a clínica.
+    assert dados["responsavel"]["clinica_id"] == dados["clinica"]["id"]
+
+    # Senha e hash nunca devem aparecer na resposta.
+    assert "senha" not in dados["responsavel"]
+    assert "senha_hash" not in dados["responsavel"]
+
+def test_usuario_inativo_nao_pode_fazer_login(client, app_context):
+    _, TestSessionLocal = app_context
+
+    cadastro = client.post(
+        "/api/cadastro",
+        json={
+            "clinica": {
+                "nome": "Clínica Usuário Inativo",
+                "cnpj": "44444444000144",
+            },
+            "responsavel": {
+                "nome": "Fisioterapeuta Inativo",
+                "email": "inativo@example.com",
+                "senha": "SenhaTeste123!",
+                "crefito": "54321-F",
+            },
+        },
+    )
+
+    assert cadastro.status_code == 201
+
+    from app.models.user import UsuarioModel
+
+    db = TestSessionLocal()
+
+    try:
+        usuario = (
+            db.query(UsuarioModel)
+            .filter(UsuarioModel.email == "inativo@example.com")
+            .first()
+        )
+
+        assert usuario is not None
+
+        usuario.ativo = False
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.post(
+        "/api/auth/login",
+        data={
+            "username": "inativo@example.com",
+            "password": "SenhaTeste123!",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": "Usuário inativo."
+    }
+
+def test_nao_permite_criar_usuario_sem_autenticacao(client):
+    cadastro = client.post(
+        "/api/cadastro",
+        json={
+            "clinica": {
+                "nome": "Clínica Protegida",
+                "cnpj": "55555555000155",
+            },
+            "responsavel": {
+                "nome": "Responsável Clínica Protegida",
+                "email": "responsavel.protegida@example.com",
+                "senha": "SenhaTeste123!",
+                "crefito": "11111-F",
+            },
+        },
+    )
+
+    assert cadastro.status_code == 201
+
+    clinica_id = cadastro.json()["clinica"]["id"]
+
+    response = client.post(
+        "/api/usuarios",
+        json={
+            "nome": "Usuário Indevido",
+            "email": "indevido@example.com",
+            "senha": "SenhaTeste123!",
+            "crefito": "99999-F",
+            "cargo": "fisioterapeuta",
+            "clinica_id": clinica_id,
+        },
+    )
+
+    assert response.status_code == 401
+
+def test_usuario_nao_pode_criar_usuario_em_outra_clinica(client):
+    cadastro_a = client.post(
+        "/api/cadastro",
+        json={
+            "clinica": {
+                "nome": "Clínica A",
+                "cnpj": "66666666000166",
+            },
+            "responsavel": {
+                "nome": "Responsável A",
+                "email": "responsavel.a@example.com",
+                "senha": "SenhaTeste123!",
+                "crefito": "11111-F",
+            },
+        },
+    )
+
+    cadastro_b = client.post(
+        "/api/cadastro",
+        json={
+            "clinica": {
+                "nome": "Clínica B",
+                "cnpj": "77777777000177",
+            },
+            "responsavel": {
+                "nome": "Responsável B",
+                "email": "responsavel.b@example.com",
+                "senha": "SenhaTeste123!",
+                "crefito": "22222-F",
+            },
+        },
+    )
+
+    assert cadastro_a.status_code == 201
+    assert cadastro_b.status_code == 201
+
+    clinica_a_id = cadastro_a.json()["clinica"]["id"]
+    clinica_b_id = cadastro_b.json()["clinica"]["id"]
+
+    login = client.post(
+        "/api/auth/login",
+        data={
+            "username": "responsavel.a@example.com",
+            "password": "SenhaTeste123!",
+        },
+    )
+
+    assert login.status_code == 200
+
+    headers_a = {
+        "Authorization": f"Bearer {login.json()['access_token']}"
+    }
+
+    response = client.post(
+        "/api/usuarios",
+        headers=headers_a,
+        json={
+            "nome": "Novo Fisioterapeuta",
+            "email": "novo.fisio@example.com",
+            "senha": "SenhaTeste123!",
+            "crefito": "33333-F",
+            "cargo": "fisioterapeuta",
+
+            # Tentativa maliciosa:
+            # usuário da Clínica A tenta escolher a Clínica B.
+            "clinica_id": clinica_b_id,
+        },
+    )
+
+    assert response.status_code == 422
+
+def test_usuario_inativo_com_token_existente_nao_pode_acessar_sistema(
+    client,
+    app_context,
+):
+    _, TestSessionLocal = app_context
+
+    cadastro = client.post(
+        "/api/cadastro",
+        json={
+            "clinica": {
+                "nome": "Clínica Token Revogado",
+                "cnpj": "66666666000166",
+            },
+            "responsavel": {
+                "nome": "Fisioterapeuta Token Revogado",
+                "email": "token.revogado@example.com",
+                "senha": "SenhaTeste123!",
+                "crefito": "22222-F",
+            },
+        },
+    )
+
+    assert cadastro.status_code == 201, cadastro.json()
+
+    login = client.post(
+        "/api/auth/login",
+        data={
+            "username": "token.revogado@example.com",
+            "password": "SenhaTeste123!",
+        },
+    )
+
+    assert login.status_code == 200
+
+    token = login.json()["access_token"]
+
+    # Confirma que o token funciona antes da desativação.
+    perfil = client.get(
+        "/api/usuarios/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert perfil.status_code == 200
+
+    from app.models.user import UsuarioModel
+
+    db = TestSessionLocal()
+
+    try:
+        usuario = (
+            db.query(UsuarioModel)
+            .filter(
+                UsuarioModel.email == "token.revogado@example.com"
+            )
+            .first()
+        )
+
+        assert usuario is not None
+
+        usuario.ativo = False
+        db.commit()
+    finally:
+        db.close()
+
+    # O mesmo token não pode continuar funcionando
+    # depois que a conta for desativada.
+    response = client.get(
+        "/api/usuarios/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+
+def test_nao_permite_acesso_direto_a_clinicas(client):
+    response_post = client.post(
+        "/api/clinicas",
+        json={
+            "nome": "Clínica Órfã",
+            "cnpj": "77777777000177",
+        },
+    )
+
+    assert response_post.status_code == 404
+
+    response_get = client.get("/api/clinicas")
+
+    assert response_get.status_code == 404
+
+def test_fisioterapeuta_nao_pode_criar_outro_usuario(client):
+    cadastro = client.post(
+        "/api/cadastro",
+        json={
+            "clinica": {
+                "nome": "Clínica Permissões",
+                "cnpj": "88888888000188",
+            },
+            "responsavel": {
+                "nome": "Administrador",
+                "email": "admin.permissoes@example.com",
+                "senha": "SenhaTeste123!",
+                "crefito": "33333-F",
+            },
+        },
+    )
+
+    assert cadastro.status_code == 201
+
+    login_admin = client.post(
+        "/api/auth/login",
+        data={
+            "username": "admin.permissoes@example.com",
+            "password": "SenhaTeste123!",
+        },
+    )
+
+    assert login_admin.status_code == 200
+    token_admin = login_admin.json()["access_token"]
+
+    criar_fisio = client.post(
+        "/api/usuarios",
+        headers={"Authorization": f"Bearer {token_admin}"},
+        json={
+            "nome": "Fisioterapeuta Comum",
+            "email": "fisio.comum@example.com",
+            "senha": "SenhaTeste123!",
+            "crefito": "44444-F",
+            "cargo": "fisioterapeuta",
+        },
+    )
+
+    assert criar_fisio.status_code == 201
+
+    login_fisio = client.post(
+        "/api/auth/login",
+        data={
+            "username": "fisio.comum@example.com",
+            "password": "SenhaTeste123!",
+        },
+    )
+
+    assert login_fisio.status_code == 200
+    token_fisio = login_fisio.json()["access_token"]
+
+    response = client.post(
+        "/api/usuarios",
+        headers={"Authorization": f"Bearer {token_fisio}"},
+        json={
+            "nome": "Usuário Indevido",
+            "email": "usuario.indevido@example.com",
+            "senha": "SenhaTeste123!",
+            "crefito": "55555-F",
+            "cargo": "fisioterapeuta",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "detail": "Apenas administradores podem criar usuários."
+    }
+
+def test_recepcao_nao_pode_acessar_prontuario_nem_registrar_consulta(client):
+    cadastro = client.post(
+        "/api/cadastro",
+        json={
+            "clinica": {
+                "nome": "Clínica Recepção",
+                "cnpj": "99999999000199",
+            },
+            "responsavel": {
+                "nome": "Administrador Recepção",
+                "email": "admin.recepcao@example.com",
+                "senha": "SenhaTeste123!",
+                "crefito": "66666-F",
+            },
+        },
+    )
+
+    assert cadastro.status_code == 201
+
+    login_admin = client.post(
+        "/api/auth/login",
+        data={
+            "username": "admin.recepcao@example.com",
+            "password": "SenhaTeste123!",
+        },
+    )
+
+    assert login_admin.status_code == 200
+
+    token_admin = login_admin.json()["access_token"]
+
+    headers_admin = {
+        "Authorization": f"Bearer {token_admin}"
+    }
+
+    criar_recepcao = client.post(
+        "/api/usuarios",
+        headers=headers_admin,
+        json={
+            "nome": "Recepcionista",
+            "email": "recepcao@example.com",
+            "senha": "SenhaTeste123!",
+            "crefito": "REC-001",
+            "cargo": "recepcao",
+        },
+    )
+
+    assert criar_recepcao.status_code == 201
+
+    paciente = client.post(
+        "/api/pacientes",
+        headers=headers_admin,
+        json={
+            "nome": "Paciente Teste Recepção",
+            "cpf": "12345678901",
+        },
+    )
+
+    assert paciente.status_code == 201
+
+    paciente_id = paciente.json()["id"]
+
+    login_recepcao = client.post(
+        "/api/auth/login",
+        data={
+            "username": "recepcao@example.com",
+            "password": "SenhaTeste123!",
+        },
+    )
+
+    assert login_recepcao.status_code == 200
+
+    token_recepcao = login_recepcao.json()["access_token"]
+
+    headers_recepcao = {
+        "Authorization": f"Bearer {token_recepcao}"
+    }
+
+    registrar = client.post(
+        "/api/consultas",
+        headers=headers_recepcao,
+        json={
+            "paciente_id": paciente_id,
+            "queixa_principal": "Dor no joelho",
+        },
+    )
+
+    assert registrar.status_code == 403
+    assert registrar.json() == {
+        "detail": "A recepção não pode registrar consultas."
+    }
+
+    prontuario = client.get(
+        f"/api/consultas/paciente/{paciente_id}",
+        headers=headers_recepcao,
+    )
+
+    assert prontuario.status_code == 403
+    assert prontuario.json() == {
+        "detail": "A recepção não pode acessar prontuários."
+    }

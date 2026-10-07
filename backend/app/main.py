@@ -25,10 +25,16 @@ from app.models.patient import PacienteModel
 from app.models.user import UsuarioModel
 
 # Schemas
-from app.schemas.clinic import ClinicaCreate, ClinicaResponse
 from app.schemas.consultation import ConsultaCreate, ConsultaResponse
 from app.schemas.patient import PacienteCreate, PacienteResponse
-from app.schemas.user import Token, TokenData, UsuarioCreate, UsuarioResponse
+from app.schemas.user import (
+    PrimeiroCadastro,
+    PrimeiroCadastroResponse,
+    Token,
+    TokenData,
+    UsuarioCreate,
+    UsuarioResponse,
+)
 
 # Criar tabelas na inicialização
 Base.metadata.create_all(bind=engine)
@@ -38,7 +44,7 @@ app = FastAPI(title="Prontuário Eletrônico API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -47,24 +53,30 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
 def obter_usuario_atual(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Não foi possível validar as credenciais",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
+
         if email is None:
             raise credentials_exception
+
     except (JWTError, jwt.PyJWTError):
         raise credentials_exception
 
     usuario = db.query(UsuarioModel).filter(UsuarioModel.email == email).first()
-    if usuario is None:
+
+    if usuario is None or not usuario.ativo:
         raise credentials_exception
+
     return usuario
 
 
@@ -77,26 +89,101 @@ def home():
 
 
 @app.post(
+    "/api/cadastro",
+    response_model=PrimeiroCadastroResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def primeiro_cadastro(
+    cadastro: PrimeiroCadastro,
+    db: Session = Depends(get_db),
+):
+    if (
+        db.query(UsuarioModel)
+        .filter(UsuarioModel.email == cadastro.responsavel.email)
+        .first()
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="E-mail já cadastrado no sistema.",
+        )
+
+    if (
+        db.query(ClinicaModel)
+        .filter(ClinicaModel.cnpj == cadastro.clinica.cnpj)
+        .first()
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="CNPJ já cadastrado no sistema.",
+        )
+
+    try:
+        nova_clinica = ClinicaModel(
+            nome=cadastro.clinica.nome,
+            cnpj=cadastro.clinica.cnpj,
+        )
+        db.add(nova_clinica)
+
+        # Obtém o ID da clínica sem confirmar a transação.
+        db.flush()
+
+        novo_responsavel = UsuarioModel(
+            nome=cadastro.responsavel.nome,
+            email=cadastro.responsavel.email,
+            senha_hash=gerar_hash_senha(cadastro.responsavel.senha),
+            crefito=cadastro.responsavel.crefito,
+            cargo="admin",
+            clinica_id=nova_clinica.id,
+        )
+
+        db.add(novo_responsavel)
+
+        # Clínica e responsável são gravados juntos.
+        db.commit()
+
+        db.refresh(nova_clinica)
+        db.refresh(novo_responsavel)
+
+        return {
+            "clinica": nova_clinica,
+            "responsavel": novo_responsavel,
+        }
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Não foi possível concluir o cadastro.",
+        )
+
+
+@app.post(
     "/api/usuarios",
     response_model=UsuarioResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def criar_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db)):
-    if (
-        db.query(UsuarioModel)
-        .filter(UsuarioModel.email == usuario.email)
-        .first()
-    ):
+def criar_usuario(
+    usuario: UsuarioCreate,
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    if usuario_atual.cargo != "admin":
         raise HTTPException(
-            status_code=400, detail="E-mail já cadastrado no sistema."
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas administradores podem criar usuários.",
         )
 
-    if (
-        not db.query(ClinicaModel)
-        .filter(ClinicaModel.id == usuario.clinica_id)
-        .first()
-    ):
-        raise HTTPException(status_code=400, detail="Clínica informada não existe.")
+    if usuario.cargo == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Não é permitido criar outro administrador.",
+        )
+
+    if db.query(UsuarioModel).filter(UsuarioModel.email == usuario.email).first():
+        raise HTTPException(
+            status_code=400,
+            detail="E-mail já cadastrado no sistema.",
+        )
 
     novo_usuario = UsuarioModel(
         nome=usuario.nome,
@@ -104,12 +191,20 @@ def criar_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db)):
         senha_hash=gerar_hash_senha(usuario.senha),
         crefito=usuario.crefito,
         cargo=usuario.cargo,
-        clinica_id=usuario.clinica_id,
+        clinica_id=usuario_atual.clinica_id,
     )
-    db.add(novo_usuario)
-    db.commit()
-    db.refresh(novo_usuario)
-    return novo_usuario
+
+    try:
+        db.add(novo_usuario)
+        db.commit()
+        db.refresh(novo_usuario)
+        return novo_usuario
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Não foi possível criar o usuário.",
+        )
 
 
 @app.post("/api/auth/login", response_model=Token)
@@ -118,18 +213,30 @@ def login(
     db: Session = Depends(get_db),
 ):
     usuario = (
-        db.query(UsuarioModel)
-        .filter(UsuarioModel.email == form_data.username)
-        .first()
+        db.query(UsuarioModel).filter(UsuarioModel.email == form_data.username).first()
     )
-    if not usuario or not verificar_senha(form_data.password, usuario.senha_hash):
+
+    if not usuario or not verificar_senha(
+        form_data.password,
+        usuario.senha_hash,
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-mail ou senha incorretos.",
         )
 
+    if not usuario.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuário inativo.",
+        )
+
     access_token = criar_token_acesso(data={"sub": usuario.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+    }
 
 
 @app.get("/api/usuarios/me", response_model=UsuarioResponse)
@@ -138,24 +245,6 @@ def obter_meu_perfil(usuario_atual: UsuarioModel = Depends(obter_usuario_atual))
 
 
 # ==================== CLÍNICAS ====================
-
-
-@app.post(
-    "/api/clinicas",
-    response_model=ClinicaResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def criar_clinica(clinica: ClinicaCreate, db: Session = Depends(get_db)):
-    nova_clinica = ClinicaModel(nome=clinica.nome, cnpj=clinica.cnpj)
-    db.add(nova_clinica)
-    db.commit()
-    db.refresh(nova_clinica)
-    return nova_clinica
-
-
-@app.get("/api/clinicas", response_model=List[ClinicaResponse])
-def listar_clinicas(db: Session = Depends(get_db)):
-    return db.query(ClinicaModel).all()
 
 
 # ==================== PACIENTES ====================
@@ -202,6 +291,7 @@ def listar_pacientes(
         .all()
     )
 
+
 # ==================== CONSULTAS E PRONTUÁRIO ====================
 
 
@@ -215,6 +305,12 @@ def registrar_consulta(
     db: Session = Depends(get_db),
     usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
 ):
+    if usuario_atual.cargo == "recepcao":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A recepção não pode registrar consultas.",
+        )
+
     paciente = (
         db.query(PacienteModel)
         .filter(
@@ -239,11 +335,20 @@ def registrar_consulta(
         observacoes=consulta.observacoes,
     )
 
-    db.add(nova_consulta)
-    db.commit()
-    db.refresh(nova_consulta)
+    try:
+        db.add(nova_consulta)
+        db.commit()
+        db.refresh(nova_consulta)
+        return nova_consulta
+    except IntegrityError:
+        db.rollback()
+    raise HTTPException(
+        status_code=400,
+        detail="Não foi possível registrar a consulta.",
+    )
 
     return nova_consulta
+
 
 @app.get(
     "/api/consultas/paciente/{paciente_id}",
@@ -254,6 +359,12 @@ def obter_prontuario_paciente(
     db: Session = Depends(get_db),
     usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
 ):
+    if usuario_atual.cargo == "recepcao":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A recepção não pode acessar prontuários.",
+        )
+
     paciente = (
         db.query(PacienteModel)
         .filter(

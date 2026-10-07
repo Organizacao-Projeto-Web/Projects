@@ -1,30 +1,30 @@
-def criar_clinica(client, nome, cnpj):
+def criar_clinica_com_responsavel(
+    client,
+    nome_clinica,
+    cnpj,
+    nome_responsavel,
+    email,
+    senha,
+):
     response = client.post(
-        "/api/clinicas",
+        "/api/cadastro",
         json={
-            "nome": nome,
-            "cnpj": cnpj,
+            "clinica": {
+                "nome": nome_clinica,
+                "cnpj": cnpj,
+            },
+            "responsavel": {
+                "nome": nome_responsavel,
+                "email": email,
+                "senha": senha,
+                "crefito": "12345-F",
+            },
         },
     )
-    assert response.status_code == 201
-    return response.json()
 
-
-def criar_usuario(client, nome, email, senha, clinica_id):
-    response = client.post(
-        "/api/usuarios",
-        json={
-            "nome": nome,
-            "email": email,
-            "senha": senha,
-            "crefito": "12345-F",
-            "cargo": "fisioterapeuta",
-            "clinica_id": clinica_id,
-        },
-    )
     assert response.status_code == 201, response.json()
-    return response.json()
 
+    return response.json()
 
 def autenticar(client, email, senha):
     response = client.post(
@@ -59,32 +59,26 @@ def criar_paciente(client, headers, nome, cpf):
 
 
 def preparar_cenario(client):
-    clinica_a = criar_clinica(
+    cadastro_a = criar_clinica_com_responsavel(
         client,
         "Clínica Teste A",
         "11111111000111",
-    )
-    clinica_b = criar_clinica(
-        client,
-        "Clínica Teste B",
-        "22222222000122",
-    )
-
-    criar_usuario(
-        client,
         "Fisioterapeuta A",
         "fisio.a@example.com",
         "SenhaTeste123!",
-        clinica_a["id"],
     )
 
-    criar_usuario(
+    cadastro_b = criar_clinica_com_responsavel(
         client,
+        "Clínica Teste B",
+        "22222222000122",
         "Fisioterapeuta B",
         "fisio.b@example.com",
         "SenhaTeste123!",
-        clinica_b["id"],
     )
+
+    clinica_a = cadastro_a["clinica"]
+    clinica_b = cadastro_b["clinica"]
 
     headers_a = autenticar(
         client,
@@ -120,7 +114,6 @@ def preparar_cenario(client):
         "paciente_a": paciente_a,
         "paciente_b": paciente_b,
     }
-
 
 def test_isolamento_de_dados_entre_clinicas(client):
     cenario = preparar_cenario(client)
@@ -214,3 +207,33 @@ def test_isolamento_de_dados_entre_clinicas(client):
     )
 
     assert response.status_code == 200
+
+def test_endpoints_clinicos_exigem_autenticacao(client):
+    response = client.post(
+        "/api/pacientes",
+        json={
+            "nome": "Paciente Sem Autenticação",
+            "cpf": "33333333333",
+            "data_nascimento": "1990-01-01",
+            "telefone": "11999999999",
+        },
+    )
+    assert response.status_code == 401
+
+    response = client.get("/api/pacientes")
+    assert response.status_code == 401
+
+    response = client.post(
+        "/api/consultas",
+        json={
+            "paciente_id": 1,
+            "queixa_principal": "Teste",
+            "diagnostico": "Teste",
+            "prescricao": "Teste",
+            "observacoes": "Teste",
+        },
+    )
+    assert response.status_code == 401
+
+    response = client.get("/api/consultas/paciente/1")
+    assert response.status_code == 401
