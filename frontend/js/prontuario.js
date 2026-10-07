@@ -85,13 +85,47 @@ async function carregarHistorico(pacienteId) {
       const data = new Date(c.created_at).toLocaleDateString("pt-BR");
       const div = document.createElement("div");
       div.className = "border-l-4 border-teal-600 bg-gray-50 p-3 rounded text-sm space-y-1 mb-3";
-      div.innerHTML = `
-        <div class="text-xs font-bold text-teal-800">Sessão em: ${data}</div>
-        <div><strong>Anamnese:</strong> ${c.queixa_principal}</div>
-        <div><strong>Diagnóstico Cinesiológico:</strong> ${c.diagnostico || '-'}</div>
-        <div><strong>Conduta / Exercícios:</strong> ${c.prescricao || '-'}</div>
-        <div><strong>Evolução:</strong> ${c.observacoes || '-'}</div>
-      `;
+      const linhaData = document.createElement("div");
+      linhaData.className = "text-xs font-bold text-teal-800";
+      linhaData.textContent = `Sessão em: ${data}`;
+
+      const linhaAnamnese = document.createElement("div");
+      const tituloAnamnese = document.createElement("strong");
+      tituloAnamnese.textContent = "Anamnese: ";
+      linhaAnamnese.appendChild(tituloAnamnese);
+      linhaAnamnese.appendChild(
+        document.createTextNode(c.queixa_principal || "-")
+      );
+
+      const linhaDiagnostico = document.createElement("div");
+      const tituloDiagnostico = document.createElement("strong");
+      tituloDiagnostico.textContent = "Diagnóstico Cinesiológico: ";
+      linhaDiagnostico.appendChild(tituloDiagnostico);
+      linhaDiagnostico.appendChild(
+        document.createTextNode(c.diagnostico || "-")
+      );
+
+      const linhaPrescricao = document.createElement("div");
+      const tituloPrescricao = document.createElement("strong");
+      tituloPrescricao.textContent = "Conduta / Exercícios: ";
+      linhaPrescricao.appendChild(tituloPrescricao);
+      linhaPrescricao.appendChild(
+        document.createTextNode(c.prescricao || "-")
+      );
+
+      const linhaObservacoes = document.createElement("div");
+      const tituloObservacoes = document.createElement("strong");
+      tituloObservacoes.textContent = "Evolução: ";
+      linhaObservacoes.appendChild(tituloObservacoes);
+      linhaObservacoes.appendChild(
+        document.createTextNode(c.observacoes || "-")
+      );
+
+      div.appendChild(linhaData);
+      div.appendChild(linhaAnamnese);
+      div.appendChild(linhaDiagnostico);
+      div.appendChild(linhaPrescricao);
+      div.appendChild(linhaObservacoes);
       container.appendChild(div);
     });
 

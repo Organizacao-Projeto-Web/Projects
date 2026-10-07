@@ -40,8 +40,22 @@ function renderizarListaPacientes(pacientes) {
     const li = document.createElement("li");
     li.className = "py-2 cursor-pointer hover:bg-teal-50 px-2 rounded text-sm flex justify-between items-center transition";
     li.onclick = () => selecionarPaciente(p);
-    li.innerHTML = `<div><strong>${p.nome}</strong><br><span class="text-xs text-gray-500">CPF: ${p.cpf || 'Não informado'}</span></div>`;
-    lista.appendChild(li);
+    const div = document.createElement("div");
+
+    const strong = document.createElement("strong");
+    strong.textContent = p.nome;
+
+    const br = document.createElement("br");
+
+    const span = document.createElement("span");
+    span.className = "text-xs text-gray-500";
+    span.textContent = `CPF: ${p.cpf || "Não informado"}`;
+
+    div.appendChild(strong);
+    div.appendChild(br);
+    div.appendChild(span);
+
+    li.appendChild(div);
   });
 }
 
