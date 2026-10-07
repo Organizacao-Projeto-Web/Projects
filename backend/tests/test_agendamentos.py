@@ -456,3 +456,80 @@ def test_cancelamento_libera_horario(client):
     )
 
     assert novo.status_code == 201, novo.json()
+
+
+def test_lista_profissionais_respeita_clinica_e_permissoes(client):
+    criar_clinica_admin(
+        client,
+        nome_clinica="Clínica Profissionais A",
+        cnpj="88888888000188",
+        nome_admin="Administrador Profissionais A",
+        email_admin="admin.profissionais.a@example.com",
+        crefito="88888-F",
+    )
+
+    criar_clinica_admin(
+        client,
+        nome_clinica="Clínica Profissionais B",
+        cnpj="99999999000199",
+        nome_admin="Administrador Profissionais B",
+        email_admin="admin.profissionais.b@example.com",
+        crefito="99999-F",
+    )
+
+    headers_admin_a = login(
+        client,
+        "admin.profissionais.a@example.com",
+    )
+
+    fisio_a = criar_usuario(
+        client,
+        headers_admin_a,
+        nome="Fisioterapeuta Lista A",
+        email="fisio.lista.a@example.com",
+        cargo="fisioterapeuta",
+        crefito="LISTA-A",
+    )
+
+    criar_usuario(
+        client,
+        headers_admin_a,
+        nome="Recepcionista Lista A",
+        email="recepcao.lista.a@example.com",
+        cargo="recepcao",
+        crefito="REC-LISTA",
+    )
+
+    lista_admin = client.get(
+        "/api/usuarios/profissionais",
+        headers=headers_admin_a,
+    )
+
+    assert lista_admin.status_code == 200
+
+    profissionais = lista_admin.json()
+
+    emails = {profissional["email"] for profissional in profissionais}
+
+    assert "admin.profissionais.a@example.com" in emails
+    assert "fisio.lista.a@example.com" in emails
+
+    assert "recepcao.lista.a@example.com" not in emails
+    assert "admin.profissionais.b@example.com" not in emails
+
+    headers_fisio = login(
+        client,
+        "fisio.lista.a@example.com",
+    )
+
+    lista_fisio = client.get(
+        "/api/usuarios/profissionais",
+        headers=headers_fisio,
+    )
+
+    assert lista_fisio.status_code == 200
+
+    profissionais_fisio = lista_fisio.json()
+
+    assert len(profissionais_fisio) == 1
+    assert profissionais_fisio[0]["id"] == fisio_a["id"]

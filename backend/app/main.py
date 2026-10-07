@@ -395,6 +395,26 @@ def obter_prontuario_paciente(
     )
 
 
+@app.get(
+    "/api/usuarios/profissionais",
+    response_model=List[UsuarioResponse],
+)
+def listar_profissionais(
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    query = db.query(UsuarioModel).filter(
+        UsuarioModel.clinica_id == usuario_atual.clinica_id,
+        UsuarioModel.ativo.is_(True),
+        UsuarioModel.cargo.in_(["fisioterapeuta", "admin"]),
+    )
+
+    if usuario_atual.cargo == "fisioterapeuta":
+        query = query.filter(UsuarioModel.id == usuario_atual.id)
+
+    return query.order_by(UsuarioModel.nome.asc()).all()
+
+
 # ==================== AGENDAMENTOS ====================
 
 
