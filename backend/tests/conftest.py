@@ -1,14 +1,13 @@
 import os
 import sys
+import pytest
 from pathlib import Path
 
-import pytest
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import sessionmaker
-
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
@@ -71,6 +70,7 @@ def app_context(test_engine):
     from app.core.database import Base, get_db
 
     # Registra todos os modelos no metadata do SQLAlchemy.
+    from app.models.appointment import AgendamentoModel  # noqa: F401
     from app.models.clinic import ClinicaModel  # noqa: F401
     from app.models.consultation import ConsultaModel  # noqa: F401
     from app.models.patient import PacienteModel  # noqa: F401
@@ -106,6 +106,7 @@ def app_context(test_engine):
     # Limpa exclusivamente o banco de testes ao final da sessão.
     Base.metadata.drop_all(bind=test_engine)
 
+
 @pytest.fixture(autouse=True)
 def limpar_banco_entre_testes(app_context, test_engine):
     from app.core.database import Base
@@ -117,6 +118,7 @@ def limpar_banco_entre_testes(app_context, test_engine):
     Base.metadata.create_all(bind=test_engine)
 
     yield
+
 
 @pytest.fixture()
 def client(app_context):
