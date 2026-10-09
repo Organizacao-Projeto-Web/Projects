@@ -306,81 +306,151 @@
     </div>
 
     <div class="container mx-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+
       <!-- COLUNA 1: PACIENTES -->
       <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-6 no-print">
         <div>
           <div class="flex justify-between items-center mb-2">
-            <h2 class="text-lg font-bold text-slate-800">Pacientes</h2>
-            <button onclick="carregarPacientes()"
-              class="text-xs bg-slate-100 p-1 px-2 rounded hover:bg-slate-200 transition">🔄 Atualizar</button>
+            <h2 class="text-lg font-bold text-slate-800">
+              Pacientes
+            </h2>
+
+            <button type="button" onclick="carregarPacientes()"
+              class="text-xs bg-slate-100 p-1 px-2 rounded hover:bg-slate-200 transition">
+              Atualizar
+            </button>
           </div>
-          <input type="text" id="busca-paciente" onkeyup="filtrarPacientes()" placeholder="🔍 Buscar por nome ou CPF..."
+
+          <input type="text" id="busca-paciente" oninput="filtrarPacientes()"
+            placeholder="Buscar por nome, CPF ou ID..."
             class="w-full border p-2 rounded-lg text-sm mb-3 focus:ring-2 focus:ring-teal-500 outline-none">
+
           <ul id="lista-pacientes" class="divide-y max-h-60 overflow-y-auto"></ul>
+
+          <div id="paciente-selecionado-card" class="hidden mt-4 p-4 bg-teal-50 border border-teal-200 rounded-xl">
+            <p class="text-xs font-semibold text-teal-700 uppercase">
+              Paciente selecionado
+            </p>
+
+            <p id="paciente-selecionado-nome" class="font-bold text-slate-800 mt-1"></p>
+
+            <p id="paciente-selecionado-detalhes" class="text-xs text-slate-500 mt-1"></p>
+
+            <button type="button" onclick="iniciarAtendimentoPaciente()"
+              class="mt-3 w-full bg-teal-700 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-800 transition">
+              Iniciar atendimento
+            </button>
+          </div>
         </div>
+
         <hr>
+
         <div>
-          <h3 class="text-md font-semibold text-slate-800 mb-2">Novo Paciente</h3>
+          <h3 class="text-md font-semibold text-slate-800 mb-2">
+            Novo Paciente
+          </h3>
+
           <form onsubmit="cadastrarPaciente(event)" class="space-y-3">
             <input type="text" id="pac-nome" placeholder="Nome Completo" required
               class="w-full border p-2 rounded-lg text-sm">
+
             <input type="text" id="pac-cpf" placeholder="CPF" class="w-full border p-2 rounded-lg text-sm">
+
             <input type="tel" id="pac-telefone" placeholder="Telefone" class="w-full border p-2 rounded-lg text-sm">
+
             <input type="date" id="pac-nascimento" class="w-full border p-2 rounded-lg text-sm">
+
             <button type="submit"
-              class="w-full bg-teal-600 text-white p-2 rounded-lg text-sm hover:bg-teal-700 font-semibold transition">Cadastrar
-              Paciente</button>
+              class="w-full bg-teal-600 text-white p-2 rounded-lg text-sm hover:bg-teal-700 font-semibold transition">
+              Cadastrar Paciente
+            </button>
           </form>
         </div>
       </div>
 
-      <!-- COLUNA 2 E 3: CONSULTAS -->
+
+      <!-- COLUNAS 2 E 3: ATENDIMENTO -->
       <div class="md:col-span-2 space-y-6">
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 no-print">
-          <h2 class="text-lg font-bold text-slate-800 mb-2">Novo Atendimento / Sessão</h2>
-          <p id="paciente-selecionado-info" class="text-sm text-teal-700 font-semibold mb-4">Nenhum paciente selecionado
+
+        <div id="area-novo-atendimento" class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 no-print">
+          <h2 class="text-lg font-bold text-slate-800 mb-2">
+            Novo Atendimento / Sessão
+          </h2>
+
+          <p id="paciente-selecionado-info" class="text-sm text-teal-700 font-semibold mb-4">
+            Nenhum paciente selecionado
           </p>
+
           <form onsubmit="registrarConsulta(event)" class="space-y-4">
             <input type="hidden" id="selected-paciente-id">
+
             <div>
-              <label class="block text-sm font-medium text-slate-700">Anamnese / Queixa Principal</label>
+              <label class="block text-sm font-medium text-slate-700">
+                Anamnese / Queixa Principal
+              </label>
+
               <textarea id="queixa" rows="2" required placeholder="Relato de dores, histórico da lesão..."
                 class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"></textarea>
             </div>
+
             <div>
-              <label class="block text-sm font-medium text-slate-700">Diagnóstico Cinesiológico Funcional</label>
+              <label class="block text-sm font-medium text-slate-700">
+                Diagnóstico Cinesiológico Funcional
+              </label>
+
               <textarea id="diagnostico" rows="2" placeholder="Limitação de ADM, fraqueza muscular, postura..."
                 class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"></textarea>
             </div>
+
             <div>
-              <label class="block text-sm font-medium text-slate-700">Conduta Terapêutica / Exercícios Aplicados</label>
+              <label class="block text-sm font-medium text-slate-700">
+                Conduta Terapêutica / Exercícios Aplicados
+              </label>
+
               <textarea id="prescricao" rows="2" placeholder="Cinesioterapia, eletroterapia, terapia manual..."
                 class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"></textarea>
             </div>
+
             <div>
-              <label class="block text-sm font-medium text-slate-700">Evolução / Observações da Sessão</label>
+              <label class="block text-sm font-medium text-slate-700">
+                Evolução / Observações da Sessão
+              </label>
+
               <textarea id="observacoes" rows="2" placeholder="Feedback do paciente pós-sessão..."
                 class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"></textarea>
             </div>
+
             <button type="submit"
-              class="bg-teal-700 text-white px-5 py-2.5 rounded-lg hover:bg-teal-800 font-semibold transition text-sm">Salvar
-              Sessão no Prontuário</button>
+              class="bg-teal-700 text-white px-5 py-2.5 rounded-lg hover:bg-teal-800 font-semibold transition text-sm">
+              Salvar Sessão no Prontuário
+            </button>
           </form>
         </div>
 
+
+        <!-- HISTÓRICO -->
         <div id="area-impressao" class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
           <div class="flex justify-between items-center mb-4 no-print">
-            <h2 class="text-lg font-bold text-slate-800">Histórico do Prontuário</h2>
-            <button onclick="window.print()"
-              class="text-xs bg-teal-50 text-teal-800 font-semibold px-3 py-1.5 rounded-lg border border-teal-200 hover:bg-teal-100 transition">🖨️
-              Imprimir / Gerar PDF</button>
+            <h2 class="text-lg font-bold text-slate-800">
+              Histórico do Prontuário
+            </h2>
+
+            <button type="button" onclick="window.print()"
+              class="text-xs bg-teal-50 text-teal-800 font-semibold px-3 py-1.5 rounded-lg border border-teal-200 hover:bg-teal-100 transition">
+              Imprimir / Gerar PDF
+            </button>
           </div>
+
           <div id="historico-consultas" class="space-y-4 max-h-96 overflow-y-auto">
-            <p class="text-sm text-slate-500">Selecione um paciente para carregar o histórico.</p>
+            <p class="text-sm text-slate-500">
+              Selecione um paciente para carregar o histórico.
+            </p>
           </div>
         </div>
+
       </div>
     </div>
+    <!-- COLUNA 2 E 3: CONSULTAS -->
   </div>
 
   <script src="js/api.js"></script>
