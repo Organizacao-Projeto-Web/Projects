@@ -193,16 +193,61 @@
         <svg class="w-6 h-6 text-teal-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2v20M8 6h8M7 10h10M8 14h8M9 18h6" />
         </svg>
+
         Reab
       </h1>
+
       <div class="flex items-center gap-4">
         <span id="user-display" class="text-sm bg-teal-800 px-3 py-1 rounded-full"></span>
-        <button onclick="logout()"
-          class="bg-red-500 text-sm px-3 py-1 rounded hover:bg-red-600 transition">Sair</button>
+
+        <button type="button" onclick="logout()"
+          class="bg-red-500 text-sm px-3 py-1 rounded hover:bg-red-600 transition">
+          Sair
+        </button>
       </div>
     </nav>
 
-    <div class="container mx-auto px-6 pt-6 no-print">
+    <!-- NAVEGAÇÃO PRINCIPAL -->
+    <div class="bg-white border-b border-slate-200 shadow-sm no-print">
+      <div class="container mx-auto px-6">
+        <div class="flex items-center gap-1 overflow-x-auto">
+
+          <button type="button" id="nav-dashboard"
+            class="px-4 py-3 text-sm font-semibold text-slate-600 hover:text-teal-700 border-b-2 border-transparent transition">
+            Dashboard
+          </button>
+
+          <button type="button" id="nav-pacientes"
+            class="px-4 py-3 text-sm font-semibold text-slate-600 hover:text-teal-700 border-b-2 border-transparent transition">
+            Pacientes
+          </button>
+
+          <button type="button" id="nav-agenda"
+            class="px-4 py-3 text-sm font-semibold text-teal-700 border-b-2 border-teal-600 transition">
+            Agenda
+          </button>
+
+          <button type="button" id="nav-atendimentos"
+            class="px-4 py-3 text-sm font-semibold text-slate-600 hover:text-teal-700 border-b-2 border-transparent transition">
+            Atendimentos
+          </button>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <section id="tela-dashboard" class="hidden container mx-auto px-6 pt-6 no-print">
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="text-xl font-bold text-slate-800">Dashboard</h2>
+        <p class="text-sm text-slate-500 mt-1">
+          Visão geral da clínica.
+        </p>
+      </div>
+    </section>
+
+    <!-- PACIENTES -->
+    <div id="tela-agenda" class="container mx-auto px-6 pt-6 no-print">
       <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-5">
           <div>
@@ -305,10 +350,11 @@
       </div>
     </div>
 
-    <div class="container mx-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="container mx-auto p-6">
 
       <!-- COLUNA 1: PACIENTES -->
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-6 no-print">
+      <div id="tela-pacientes"
+        class="hidden bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-6 no-print">
         <div>
           <div class="flex justify-between items-center mb-2">
             <h2 class="text-lg font-bold text-slate-800">
@@ -370,7 +416,7 @@
 
 
       <!-- COLUNAS 2 E 3: ATENDIMENTO -->
-      <div class="md:col-span-2 space-y-6">
+      <div id="tela-atendimentos" class="hidden md:col-span-2 space-y-6">
 
         <div id="area-novo-atendimento" class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 no-print">
           <h2 class="text-lg font-bold text-slate-800 mb-2">
@@ -457,6 +503,7 @@
   <script src="js/pacientes.js"></script>
   <script src="js/prontuario.js"></script>
   <script src="js/agendamentos.js"></script>
+  <script src="js/navegacao.js"></script>
   <script src="js/auth.js"></script>
 </body>
 
