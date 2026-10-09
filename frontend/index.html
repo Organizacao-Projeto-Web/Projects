@@ -392,6 +392,49 @@
         <hr>
 
         <div>
+          <div class="flex justify-between items-center mb-3">
+            <h2 class="text-lg font-bold text-slate-800">
+              Pacientes
+            </h2>
+
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="carregarPacientes()"
+                class="text-xs bg-slate-100 px-3 py-2 rounded-lg hover:bg-slate-200 transition">
+                Atualizar
+              </button>
+
+              <button type="button" id="btn-novo-paciente" onclick="alternarFormularioNovoPaciente()"
+                class="text-sm bg-teal-700 text-white px-3 py-2 rounded-lg font-semibold hover:bg-teal-800 transition">
+                + Novo paciente
+              </button>
+            </div>
+          </div>
+
+          <input type="text" id="busca-paciente" oninput="filtrarPacientes()"
+            placeholder="Buscar por nome, CPF ou ID..."
+            class="w-full border p-2 rounded-lg text-sm mb-3 focus:ring-2 focus:ring-teal-500 outline-none">
+
+          <ul id="lista-pacientes" class="divide-y max-h-60 overflow-y-auto"></ul>
+
+          <div id="paciente-selecionado-card" class="hidden mt-4 p-4 bg-teal-50 border border-teal-200 rounded-xl">
+            <p class="text-xs font-semibold text-teal-700 uppercase">
+              Paciente selecionado
+            </p>
+
+            <p id="paciente-selecionado-nome" class="font-bold text-slate-800 mt-1"></p>
+
+            <p id="paciente-selecionado-detalhes" class="text-xs text-slate-500 mt-1"></p>
+
+            <button type="button" onclick="iniciarAtendimentoPaciente()"
+              class="mt-3 w-full bg-teal-700 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-teal-800 transition">
+              Iniciar atendimento
+            </button>
+          </div>
+        </div>
+
+        <hr>
+
+        <div id="form-novo-paciente" class="hidden">
           <h3 class="text-md font-semibold text-slate-800 mb-2">
             Novo Paciente
           </h3>

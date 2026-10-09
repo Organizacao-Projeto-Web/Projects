@@ -302,3 +302,21 @@ async function cadastrarPaciente(e) {
     alert(err.message);
   }
 }
+
+function alternarFormularioNovoPaciente() {
+  const formulario = document.getElementById("form-novo-paciente");
+  const botao = document.getElementById("btn-novo-paciente");
+
+  if (!formulario || !botao) return;
+
+  const estaFechado = formulario.classList.contains("hidden");
+
+  formulario.classList.toggle("hidden");
+
+  if (estaFechado) {
+    botao.textContent = "Fechar";
+    document.getElementById("pac-nome")?.focus();
+  } else {
+    botao.textContent = "+ Novo paciente";
+  }
+}
