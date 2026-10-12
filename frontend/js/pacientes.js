@@ -370,6 +370,28 @@ function abrirPerfilPaciente() {
   });
 }
 
+function abrirHistoricoPaciente() {
+  if (!pacienteSelecionado) {
+    alert("Selecione um paciente primeiro.");
+    return;
+  }
+
+  carregarHistorico(pacienteSelecionado.id);
+
+  mostrarTela("atendimentos");
+
+  const historico = document.getElementById("area-impressao");
+
+  if (historico) {
+    setTimeout(() => {
+      historico.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 100);
+  }
+}
+
 
 function fecharPerfilPaciente() {
   const perfil = document.getElementById("perfil-paciente-card");
@@ -388,4 +410,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document
     .getElementById("btn-fechar-perfil")
     ?.addEventListener("click", fecharPerfilPaciente);
+
+  document
+    .getElementById("btn-ver-historico")
+    ?.addEventListener("click", abrirHistoricoPaciente);
 });
