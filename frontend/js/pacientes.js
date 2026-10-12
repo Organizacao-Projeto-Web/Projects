@@ -234,15 +234,19 @@ function iniciarAtendimentoPaciente() {
     return;
   }
 
+  mostrarTela("atendimentos");
+
   const areaAtendimento = document.getElementById(
     "area-novo-atendimento"
   );
 
   if (areaAtendimento) {
-    areaAtendimento.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
+    setTimeout(() => {
+      areaAtendimento.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 100);
   }
 
   const campoQueixa = document.getElementById("queixa");
