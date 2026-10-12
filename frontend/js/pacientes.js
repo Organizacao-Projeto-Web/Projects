@@ -186,8 +186,7 @@ function selecionarPaciente(paciente) {
     nome.textContent = paciente.nome;
 
     detalhes.textContent =
-      `ID #${paciente.id} • CPF: ${
-        paciente.cpf || "Não informado"
+      `ID #${paciente.id} • CPF: ${paciente.cpf || "Não informado"
       }`;
 
     painel.classList.remove("hidden");
@@ -324,3 +323,69 @@ function alternarFormularioNovoPaciente() {
     botao.textContent = "+ Novo paciente";
   }
 }
+
+function formatarDataPaciente(data) {
+  if (!data) {
+    return "Não informado";
+  }
+
+  const partes = data.split("-");
+
+  if (partes.length !== 3) {
+    const [ano, mes, dia] = partes;
+    return `${dia}/${mes}/${ano}`;
+  }
+
+  return data;
+}
+
+function abrirPerfilPaciente() {
+  if (!pacienteSelecionado) {
+    alert("Selecione um paciente primeiro.");
+    return;
+  }
+
+  document.getElementById("perfil-paciente-nome").textContent =
+    pacienteSelecionado.nome;
+
+  document.getElementById("perfil-paciente-id").textContent =
+    `#${pacienteSelecionado.id}`;
+
+  document.getElementById("perfil-paciente-cpf").textContent =
+    pacienteSelecionado.cpf || "Não informado";
+
+  document.getElementById("perfil-paciente-telefone").textContent =
+    pacienteSelecionado.telefone || "Não informado";
+
+  document.getElementById("perfil-paciente-nascimento").textContent =
+    formatarDataPaciente(pacienteSelecionado.data_nascimento);
+
+  const perfil = document.getElementById("perfil-paciente-card");
+
+  perfil.classList.remove("hidden");
+
+  perfil.scrollIntoView({
+    behavior: "smooth",
+    block: "nearest"
+  });
+}
+
+
+function fecharPerfilPaciente() {
+  const perfil = document.getElementById("perfil-paciente-card");
+
+  if (perfil) {
+    perfil.classList.add("hidden");
+  }
+}
+
+
+document.addEventListener("DOMContentLoaded", () => {
+  document
+    .getElementById("btn-ver-perfil")
+    ?.addEventListener("click", abrirPerfilPaciente);
+
+  document
+    .getElementById("btn-fechar-perfil")
+    ?.addEventListener("click", fecharPerfilPaciente);
+});
