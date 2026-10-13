@@ -238,11 +238,55 @@
 
     <!-- DASHBOARD -->
     <section id="tela-dashboard" class="hidden w-full px-6 pt-6 no-print">
-      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-        <h2 class="text-xl font-bold text-slate-800">Dashboard</h2>
+      <div class="mb-6">
+        <h2 class="text-2xl font-bold text-slate-800">Dashboard</h2>
         <p class="text-sm text-slate-500 mt-1">
-          Visão geral da clínica.
+          Visão geral da clínica e dos atendimentos.
         </p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+
+        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+          <p class="text-sm text-slate-500">Pacientes</p>
+          <p id="dashboard-total-pacientes" class="text-3xl font-bold text-slate-800 mt-2">
+            --
+          </p>
+          <p class="text-xs text-slate-400 mt-1">
+            pacientes cadastrados
+          </p>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+          <p class="text-sm text-slate-500">Agendamentos de hoje</p>
+          <p id="dashboard-agendamentos-hoje" class="text-3xl font-bold text-slate-800 mt-2">
+            --
+          </p>
+          <p class="text-xs text-slate-400 mt-1">
+            atendimentos previstos
+          </p>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+          <p class="text-sm text-slate-500">Próximos agendamentos</p>
+          <p id="dashboard-proximos" class="text-3xl font-bold text-slate-800 mt-2">
+            --
+          </p>
+          <p class="text-xs text-slate-400 mt-1">
+            ainda pendentes
+          </p>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+          <p class="text-sm text-slate-500">Atendimentos realizados</p>
+          <p id="dashboard-realizados" class="text-3xl font-bold text-slate-800 mt-2">
+            --
+          </p>
+          <p class="text-xs text-slate-400 mt-1">
+            registrados na agenda
+          </p>
+        </div>
+
       </div>
     </section>
 
@@ -566,6 +610,7 @@
   <script src="js/pacientes.js"></script>
   <script src="js/prontuario.js"></script>
   <script src="js/agendamentos.js"></script>
+  <script src="js/dashboard.js"></script>
   <script src="js/navegacao.js"></script>
   <script src="js/auth.js"></script>
 </body>
