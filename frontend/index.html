@@ -237,57 +237,146 @@
     </div>
 
     <!-- DASHBOARD -->
-    <section id="tela-dashboard" class="hidden w-full px-6 pt-6 no-print">
-      <div class="mb-6">
-        <h2 class="text-2xl font-bold text-slate-800">Dashboard</h2>
-        <p class="text-sm text-slate-500 mt-1">
-          Visão geral da clínica e dos atendimentos.
-        </p>
+    <section id="tela-dashboard" class="hidden w-full p-6 no-print">
+
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+
+        <!-- CABEÇALHO -->
+        <div class="mb-6">
+          <h2 class="text-2xl font-bold text-slate-800">
+            Dashboard
+          </h2>
+
+          <p class="text-sm text-slate-500 mt-1">
+            Visão geral da clínica e dos atendimentos.
+          </p>
+        </div>
+
+
+        <!-- INDICADORES -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+            <p class="text-sm text-slate-500">
+              Pacientes
+            </p>
+
+            <p id="dashboard-total-pacientes" class="text-3xl font-bold text-slate-800 mt-2">
+              --
+            </p>
+
+            <p class="text-xs text-slate-400 mt-1">
+              pacientes cadastrados
+            </p>
+          </div>
+
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+            <p class="text-sm text-slate-500">
+              Agendamentos de hoje
+            </p>
+
+            <p id="dashboard-agendamentos-hoje" class="text-3xl font-bold text-slate-800 mt-2">
+              --
+            </p>
+
+            <p class="text-xs text-slate-400 mt-1">
+              atendimentos previstos
+            </p>
+          </div>
+
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+            <p class="text-sm text-slate-500">
+              Próximos agendamentos
+            </p>
+
+            <p id="dashboard-proximos" class="text-3xl font-bold text-slate-800 mt-2">
+              --
+            </p>
+
+            <p class="text-xs text-slate-400 mt-1">
+              ainda pendentes
+            </p>
+          </div>
+
+
+          <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+            <p class="text-sm text-slate-500">
+              Atendimentos realizados
+            </p>
+
+            <p id="dashboard-realizados" class="text-3xl font-bold text-slate-800 mt-2">
+              --
+            </p>
+
+            <p class="text-xs text-slate-400 mt-1">
+              registrados na agenda
+            </p>
+          </div>
+
+        </div>
+
+
+        <!-- RESUMO OPERACIONAL -->
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-6">
+
+          <!-- AGENDA DE HOJE -->
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+
+            <div class="flex items-center justify-between gap-4 px-5 py-4 border-b border-slate-100">
+
+              <div>
+                <h3 class="font-bold text-slate-800">
+                  Agenda de hoje
+                </h3>
+
+                <p class="text-xs text-slate-500 mt-1">
+                  Atendimentos programados para hoje.
+                </p>
+              </div>
+
+              <button type="button" onclick="mostrarTela('agenda')"
+                class="text-sm font-semibold text-teal-700 hover:text-teal-800 transition">
+                Ver agenda
+              </button>
+
+            </div>
+
+            <div id="dashboard-agenda-hoje-lista" class="p-5 space-y-3">
+              <p class="text-sm text-slate-500">
+                Carregando agenda...
+              </p>
+            </div>
+
+          </div>
+
+
+          <!-- ACOMPANHAMENTO CLÍNICO -->
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+
+            <div class="px-5 py-4 border-b border-slate-100">
+              <h3 class="font-bold text-slate-800">
+                Acompanhamento clínico
+              </h3>
+
+              <p class="text-xs text-slate-500 mt-1">
+                Evolução recente dos pacientes.
+              </p>
+            </div>
+
+            <div id="dashboard-acompanhamento-lista" class="p-5 space-y-3">
+              <p class="text-sm text-slate-500">
+                Nenhuma evolução carregada ainda.
+              </p>
+            </div>
+
+          </div>
+
+        </div>
+
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-
-        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-          <p class="text-sm text-slate-500">Pacientes</p>
-          <p id="dashboard-total-pacientes" class="text-3xl font-bold text-slate-800 mt-2">
-            --
-          </p>
-          <p class="text-xs text-slate-400 mt-1">
-            pacientes cadastrados
-          </p>
-        </div>
-
-        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-          <p class="text-sm text-slate-500">Agendamentos de hoje</p>
-          <p id="dashboard-agendamentos-hoje" class="text-3xl font-bold text-slate-800 mt-2">
-            --
-          </p>
-          <p class="text-xs text-slate-400 mt-1">
-            atendimentos previstos
-          </p>
-        </div>
-
-        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-          <p class="text-sm text-slate-500">Próximos agendamentos</p>
-          <p id="dashboard-proximos" class="text-3xl font-bold text-slate-800 mt-2">
-            --
-          </p>
-          <p class="text-xs text-slate-400 mt-1">
-            ainda pendentes
-          </p>
-        </div>
-
-        <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-          <p class="text-sm text-slate-500">Atendimentos realizados</p>
-          <p id="dashboard-realizados" class="text-3xl font-bold text-slate-800 mt-2">
-            --
-          </p>
-          <p class="text-xs text-slate-400 mt-1">
-            registrados na agenda
-          </p>
-        </div>
-
-      </div>
     </section>
 
     <!-- PACIENTES -->
@@ -295,8 +384,11 @@
       <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-5">
           <div>
-            <h2 class="text-lg font-bold text-slate-800">Agenda</h2>
-            <p class="text-sm text-slate-500">
+            <h2 class="text-2xl font-bold text-slate-800">
+              Agenda
+            </h2>
+
+            <p class="text-sm text-slate-500 mt-1">
               Agende e acompanhe os atendimentos da clínica.
             </p>
           </div>
@@ -401,10 +493,16 @@
         class="hidden bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-6 no-print">
 
         <div>
-          <div class="flex justify-between items-center mb-3">
-            <h2 class="text-lg font-bold text-slate-800">
-              Pacientes
-            </h2>
+          <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-5">
+            <div>
+              <h2 class="text-2xl font-bold text-slate-800">
+                Pacientes
+              </h2>
+
+              <p class="text-sm text-slate-500 mt-1">
+                Consulte, cadastre e acompanhe os pacientes da clínica.
+              </p>
+            </div>
 
             <div class="flex items-center gap-2">
               <button type="button" onclick="carregarPacientes()"
@@ -526,15 +624,155 @@
       <div id="tela-atendimentos" class="hidden md:col-span-2 space-y-6">
 
         <div id="area-novo-atendimento" class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 no-print">
-          <h2 class="text-lg font-bold text-slate-800 mb-2">
-            Novo Atendimento / Sessão
-          </h2>
+          <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
 
-          <p id="paciente-selecionado-info" class="text-sm text-teal-700 font-semibold mb-4">
-            Nenhum paciente selecionado
-          </p>
+            <div>
+              <h2 class="text-2xl font-bold text-slate-800 mt-1">
+                Atendimento fisioterapêutico
+              </h2>
+
+              <p id="paciente-selecionado-info" class="text-sm text-slate-500 font-medium mt-2">
+                Nenhum paciente selecionado
+              </p>
+            </div>
+
+            <button type="button" onclick="mostrarTela('pacientes')"
+              class="text-sm bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-semibold hover:bg-slate-200 transition">
+              Trocar paciente
+            </button>
+
+          </div>
 
           <form onsubmit="registrarConsulta(event)" class="space-y-4">
+            <div class="space-y-5">
+
+              <!-- DOR ATUAL -->
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <label class="block text-sm font-medium text-slate-700">
+                    Dor atual
+                  </label>
+
+                  <span class="text-xs text-slate-400">
+                    0 = sem dor | 10 = dor máxima
+                  </span>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="dor-atual" value="0" class="sr-only peer">
+                    <span
+                      class="w-10 h-10 flex items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">
+                      0
+                    </span>
+                  </label>
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="dor-atual" value="1" class="sr-only peer">
+                    <span
+                      class="w-10 h-10 flex items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">1</span>
+                  </label>
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="dor-atual" value="2" class="sr-only peer">
+                    <span
+                      class="w-10 h-10 flex items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">2</span>
+                  </label>
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="dor-atual" value="3" class="sr-only peer">
+                    <span
+                      class="w-10 h-10 flex items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">3</span>
+                  </label>
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="dor-atual" value="4" class="sr-only peer">
+                    <span
+                      class="w-10 h-10 flex items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">4</span>
+                  </label>
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="dor-atual" value="5" class="sr-only peer">
+                    <span
+                      class="w-10 h-10 flex items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">5</span>
+                  </label>
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="dor-atual" value="6" class="sr-only peer">
+                    <span
+                      class="w-10 h-10 flex items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">6</span>
+                  </label>
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="dor-atual" value="7" class="sr-only peer">
+                    <span
+                      class="w-10 h-10 flex items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">7</span>
+                  </label>
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="dor-atual" value="8" class="sr-only peer">
+                    <span
+                      class="w-10 h-10 flex items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">8</span>
+                  </label>
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="dor-atual" value="9" class="sr-only peer">
+                    <span
+                      class="w-10 h-10 flex items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">9</span>
+                  </label>
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="dor-atual" value="10" class="sr-only peer">
+                    <span
+                      class="w-10 h-10 flex items-center justify-center rounded-full border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">
+                      10
+                    </span>
+                  </label>
+
+                </div>
+              </div>
+
+
+              <!-- PERCEPÇÃO DO PACIENTE -->
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">
+                  Percepção do paciente
+                </label>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="percepcao-paciente" value="melhorou" class="sr-only peer">
+
+                    <span
+                      class="flex items-center justify-center px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">
+                      Melhorou
+                    </span>
+                  </label>
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="percepcao-paciente" value="igual" class="sr-only peer">
+
+                    <span
+                      class="flex items-center justify-center px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">
+                      Permaneceu igual
+                    </span>
+                  </label>
+
+                  <label class="cursor-pointer">
+                    <input type="radio" name="percepcao-paciente" value="piorou" class="sr-only peer">
+
+                    <span
+                      class="flex items-center justify-center px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-teal-400 peer-checked:bg-teal-600 peer-checked:border-teal-600 peer-checked:text-white">
+                      Piorou
+                    </span>
+                  </label>
+
+                </div>
+              </div>
+
+            </div>
             <input type="hidden" id="selected-paciente-id">
 
             <div>

@@ -340,6 +340,8 @@ def registrar_consulta(
         diagnostico=consulta.diagnostico,
         prescricao=consulta.prescricao,
         observacoes=consulta.observacoes,
+        dor_atual=consulta.dor_atual,
+        percepcao_paciente=consulta.percepcao_paciente,
     )
 
     try:

@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ConsultaBase(BaseModel):
@@ -10,6 +10,8 @@ class ConsultaBase(BaseModel):
     diagnostico: Optional[str] = None
     prescricao: Optional[str] = None
     observacoes: Optional[str] = None
+    dor_atual: Optional[int] = Field(default=None, ge=0, le=10)
+    percepcao_paciente: Optional[Literal["melhorou", "igual", "piorou"]] = None
 
 
 class ConsultaCreate(ConsultaBase):
