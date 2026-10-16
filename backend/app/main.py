@@ -27,7 +27,11 @@ from app.models.patient import PacienteModel
 from app.models.user import UsuarioModel
 
 # Schemas
-from app.schemas.consultation import ConsultaCreate, ConsultaResponse
+from app.schemas.consultation import (
+    AcompanhamentoClinicoResponse,
+    ConsultaCreate,
+    ConsultaResponse,
+)
 from app.schemas.patient import PacienteCreate, PacienteResponse
 from app.schemas.user import (
     PrimeiroCadastro,
@@ -395,6 +399,92 @@ def obter_prontuario_paciente(
         .order_by(ConsultaModel.created_at.desc())
         .all()
     )
+
+
+@app.get(
+    "/api/dashboard/acompanhamento-clinico",
+    response_model=List[AcompanhamentoClinicoResponse],
+)
+def obter_acompanhamento_clinico(
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    if usuario_atual.cargo == "recepcao":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A recepção não pode acessar dados clínicos.",
+        )
+
+    registros = (
+        db.query(ConsultaModel, PacienteModel)
+        .join(
+            PacienteModel,
+            ConsultaModel.paciente_id == PacienteModel.id,
+        )
+        .filter(PacienteModel.clinica_id == usuario_atual.clinica_id)
+        .order_by(
+            ConsultaModel.paciente_id.asc(),
+            ConsultaModel.created_at.desc(),
+        )
+        .all()
+    )
+
+    consultas_por_paciente = {}
+
+    for consulta, paciente in registros:
+        if paciente.id not in consultas_por_paciente:
+            consultas_por_paciente[paciente.id] = {
+                "paciente": paciente,
+                "consultas": [],
+            }
+
+        consultas_por_paciente[paciente.id]["consultas"].append(consulta)
+
+    resultado = []
+
+    for item in consultas_por_paciente.values():
+        paciente = item["paciente"]
+        consultas = item["consultas"]
+
+        consulta_atual = consultas[0]
+
+        consulta_anterior = consultas[1] if len(consultas) > 1 else None
+
+        sessoes_sem_melhora = 0
+
+        for consulta in consultas:
+            if consulta.percepcao_paciente in (
+                "igual",
+                "piorou",
+            ):
+                sessoes_sem_melhora += 1
+
+            elif consulta.percepcao_paciente == "melhorou":
+                break
+
+            else:
+                break
+
+        resultado.append(
+            {
+                "paciente_id": paciente.id,
+                "paciente_nome": paciente.nome,
+                "dor_atual": consulta_atual.dor_atual,
+                "dor_anterior": (
+                    consulta_anterior.dor_atual if consulta_anterior else None
+                ),
+                "percepcao_paciente": (consulta_atual.percepcao_paciente),
+                "sessoes_sem_melhora": sessoes_sem_melhora,
+                "ultima_sessao": consulta_atual.created_at,
+            }
+        )
+
+    resultado.sort(
+        key=lambda item: item["ultima_sessao"],
+        reverse=True,
+    )
+
+    return resultado[:5]
 
 
 @app.get(

@@ -24,3 +24,17 @@ class ConsultaResponse(ConsultaBase):
     id: int
     medico_id: int
     created_at: datetime
+
+
+class AcompanhamentoClinicoResponse(BaseModel):
+    paciente_id: int
+    paciente_nome: str
+
+    dor_atual: Optional[int] = None
+    dor_anterior: Optional[int] = None
+
+    percepcao_paciente: Optional[Literal["melhorou", "igual", "piorou"]] = None
+
+    sessoes_sem_melhora: int = 0
+
+    ultima_sessao: datetime

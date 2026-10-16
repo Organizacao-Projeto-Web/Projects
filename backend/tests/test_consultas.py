@@ -61,6 +61,31 @@ def criar_paciente(
     return response.json()
 
 
+def criar_usuario(
+    client,
+    headers_admin,
+    nome,
+    email,
+    cargo,
+    crefito,
+):
+    response = client.post(
+        "/api/usuarios",
+        headers=headers_admin,
+        json={
+            "nome": nome,
+            "email": email,
+            "senha": "SenhaTeste123!",
+            "cargo": cargo,
+            "crefito": crefito,
+        },
+    )
+
+    assert response.status_code == 201, response.json()
+
+    return response.json()
+
+
 def preparar_consulta(client):
     criar_clinica_admin(
         client,
@@ -157,3 +182,136 @@ def test_consulta_rejeita_percepcao_invalida(client):
     )
 
     assert response.status_code == 422
+
+
+def test_acompanhamento_clinico_exige_autenticacao(client):
+    response = client.get("/api/dashboard/acompanhamento-clinico")
+
+    assert response.status_code == 401
+
+
+def test_recepcao_nao_pode_acessar_acompanhamento_clinico(client):
+    criar_clinica_admin(
+        client,
+        nome_clinica="Clínica Dashboard Recepção",
+        cnpj="61111111000111",
+        nome_admin="Administrador Dashboard",
+        email_admin="admin.dashboard.recepcao@example.com",
+        crefito="61111-F",
+    )
+
+    headers_admin = login(
+        client,
+        "admin.dashboard.recepcao@example.com",
+    )
+
+    criar_usuario(
+        client,
+        headers_admin,
+        nome="Recepcionista Dashboard",
+        email="recepcao.dashboard@example.com",
+        cargo="recepcao",
+        crefito="REC-611",
+    )
+
+    headers_recepcao = login(
+        client,
+        "recepcao.dashboard@example.com",
+    )
+
+    response = client.get(
+        "/api/dashboard/acompanhamento-clinico",
+        headers=headers_recepcao,
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "A recepção não pode acessar dados clínicos."}
+
+
+def test_acompanhamento_clinico_isola_dados_por_clinica(client):
+    criar_clinica_admin(
+        client,
+        nome_clinica="Clínica Dashboard A",
+        cnpj="62222222000122",
+        nome_admin="Administrador Dashboard A",
+        email_admin="admin.dashboard.a@example.com",
+        crefito="62222-F",
+    )
+
+    criar_clinica_admin(
+        client,
+        nome_clinica="Clínica Dashboard B",
+        cnpj="63333333000133",
+        nome_admin="Administrador Dashboard B",
+        email_admin="admin.dashboard.b@example.com",
+        crefito="63333-F",
+    )
+
+    headers_a = login(
+        client,
+        "admin.dashboard.a@example.com",
+    )
+
+    headers_b = login(
+        client,
+        "admin.dashboard.b@example.com",
+    )
+
+    paciente_a = criar_paciente(
+        client,
+        headers_a,
+        nome="Paciente Dashboard A",
+        cpf="62222222222",
+    )
+
+    paciente_b = criar_paciente(
+        client,
+        headers_b,
+        nome="Paciente Dashboard B",
+        cpf="63333333333",
+    )
+
+    consulta_a = client.post(
+        "/api/consultas",
+        headers=headers_a,
+        json={
+            "paciente_id": paciente_a["id"],
+            "queixa_principal": "Dor no joelho",
+            "dor_atual": 4,
+            "percepcao_paciente": "melhorou",
+        },
+    )
+
+    assert consulta_a.status_code == 201, consulta_a.json()
+
+    consulta_b = client.post(
+        "/api/consultas",
+        headers=headers_b,
+        json={
+            "paciente_id": paciente_b["id"],
+            "queixa_principal": "Dor lombar",
+            "dor_atual": 9,
+            "percepcao_paciente": "piorou",
+        },
+    )
+
+    assert consulta_b.status_code == 201, consulta_b.json()
+
+    response = client.get(
+        "/api/dashboard/acompanhamento-clinico",
+        headers=headers_a,
+    )
+
+    assert response.status_code == 200, response.json()
+
+    acompanhamento = response.json()
+
+    ids_visiveis = {item["paciente_id"] for item in acompanhamento}
+
+    assert paciente_a["id"] in ids_visiveis
+    assert paciente_b["id"] not in ids_visiveis
+
+    nomes_visiveis = {item["paciente_nome"] for item in acompanhamento}
+
+    assert "Paciente Dashboard A" in nomes_visiveis
+    assert "Paciente Dashboard B" not in nomes_visiveis
