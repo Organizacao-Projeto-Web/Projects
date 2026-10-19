@@ -16,6 +16,7 @@ def criar_clinica_com_responsavel(
             "responsavel": {
                 "nome": nome_responsavel,
                 "email": email,
+                "whatsapp": "5575999999999",
                 "senha": senha,
                 "crefito": "12345-F",
             },
