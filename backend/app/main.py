@@ -141,6 +141,7 @@ def primeiro_cadastro(
         novo_responsavel = UsuarioModel(
             nome=cadastro.responsavel.nome,
             email=cadastro.responsavel.email,
+            whatsapp=cadastro.responsavel.whatsapp,
             senha_hash=gerar_hash_senha(cadastro.responsavel.senha),
             crefito=cadastro.responsavel.crefito,
             cargo="admin",
@@ -149,7 +150,6 @@ def primeiro_cadastro(
 
         db.add(novo_responsavel)
 
-        # Clínica e responsável são gravados juntos.
         db.commit()
 
         db.refresh(nova_clinica)
@@ -199,6 +199,7 @@ def criar_usuario(
     novo_usuario = UsuarioModel(
         nome=usuario.nome,
         email=usuario.email,
+        whatsapp=usuario.whatsapp,
         senha_hash=gerar_hash_senha(usuario.senha),
         crefito=usuario.crefito,
         cargo=usuario.cargo,

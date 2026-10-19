@@ -16,6 +16,7 @@ def criar_clinica_admin(
             "responsavel": {
                 "nome": nome_admin,
                 "email": email_admin,
+                "whatsapp": "5575999999999",
                 "senha": "SenhaTeste123!",
                 "crefito": crefito,
             },
@@ -75,6 +76,7 @@ def criar_usuario(
         json={
             "nome": nome,
             "email": email,
+            "whatsapp": "5575999999999",
             "senha": "SenhaTeste123!",
             "cargo": cargo,
             "crefito": crefito,

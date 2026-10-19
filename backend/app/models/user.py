@@ -11,6 +11,7 @@ class UsuarioModel(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     nome = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
+    whatsapp = Column(String(20), nullable=True)
     senha_hash = Column(String(255), nullable=False)
     crefito = Column(String(30), nullable=True)
     cargo = Column(

@@ -9,11 +9,19 @@ from app.schemas.clinic import ClinicaResponse
 class UsuarioBase(BaseModel):
     nome: str = Field(min_length=2, max_length=150)
     email: EmailStr
+
+    whatsapp: Optional[str] = Field(
+        default=None,
+        min_length=10,
+        max_length=20,
+    )
+
     crefito: Optional[str] = Field(
         default=None,
         min_length=3,
         max_length=30,
     )
+
     cargo: Literal[
         "fisioterapeuta",
         "admin",
@@ -24,7 +32,15 @@ class UsuarioBase(BaseModel):
 class UsuarioCreate(UsuarioBase):
     model_config = ConfigDict(extra="forbid")
 
-    senha: str = Field(min_length=8, max_length=128)
+    whatsapp: str = Field(
+        min_length=10,
+        max_length=20,
+    )
+
+    senha: str = Field(
+        min_length=8,
+        max_length=128,
+    )
 
 
 class UsuarioResponse(UsuarioBase):
@@ -53,7 +69,14 @@ class ClinicaCadastro(BaseModel):
 class ResponsavelCadastro(BaseModel):
     nome: str = Field(min_length=2, max_length=150)
     email: EmailStr
+
+    whatsapp: str = Field(
+        min_length=10,
+        max_length=20,
+    )
+
     senha: str = Field(min_length=8, max_length=128)
+
     crefito: Optional[str] = Field(
         default=None,
         min_length=3,
