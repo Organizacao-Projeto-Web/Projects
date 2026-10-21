@@ -18,6 +18,7 @@ from app.core.security import (
     gerar_codigo_recuperacao,
     gerar_hash_codigo_recuperacao,
     gerar_hash_senha,
+    verificar_codigo_recuperacao,
     verificar_senha,
 )
 
@@ -39,6 +40,8 @@ from app.schemas.patient import PacienteCreate, PacienteResponse
 from app.schemas.password_reset import (
     MensagemRecuperacaoResponse,
     SolicitarRecuperacaoSenhaRequest,
+    TokenRedefinicaoSenhaResponse,
+    VerificarCodigoRecuperacaoRequest,
 )
 from app.schemas.user import (
     PrimeiroCadastro,
@@ -304,6 +307,95 @@ def solicitar_recuperacao_senha(
     db.commit()
 
     return mensagem
+
+
+@app.post(
+    "/api/auth/recuperacao-senha/verificar",
+    response_model=TokenRedefinicaoSenhaResponse,
+)
+def verificar_codigo_recuperacao_senha(
+    dados: VerificarCodigoRecuperacaoRequest,
+    db: Session = Depends(get_db),
+):
+    usuario = (
+        db.query(UsuarioModel).filter(UsuarioModel.email == str(dados.email)).first()
+    )
+
+    mensagem_erro = "Código inválido ou expirado."
+
+    if not usuario or not usuario.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    codigo_registro = (
+        db.query(PasswordResetCodeModel)
+        .filter(
+            PasswordResetCodeModel.usuario_id == usuario.id,
+            PasswordResetCodeModel.used_at.is_(None),
+        )
+        .order_by(PasswordResetCodeModel.id.desc())
+        .first()
+    )
+
+    if not codigo_registro:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    agora = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    if codigo_registro.expires_at <= agora:
+        codigo_registro.used_at = agora
+        db.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    if codigo_registro.tentativas >= 5:
+        codigo_registro.used_at = agora
+        db.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    if not verificar_codigo_recuperacao(
+        dados.codigo,
+        codigo_registro.codigo_hash,
+    ):
+        codigo_registro.tentativas += 1
+
+        if codigo_registro.tentativas >= 5:
+            codigo_registro.used_at = agora
+
+        db.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    codigo_registro.used_at = agora
+    db.commit()
+
+    reset_token = criar_token_acesso(
+        data={
+            "sub": "password_reset",
+            "uid": usuario.id,
+            "purpose": "password_reset",
+        },
+        expires_delta=timedelta(minutes=10),
+    )
+
+    return {
+        "reset_token": reset_token,
+    }
 
 
 @app.get("/api/usuarios/me", response_model=UsuarioResponse)
