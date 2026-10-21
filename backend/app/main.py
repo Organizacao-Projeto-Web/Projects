@@ -1,32 +1,40 @@
 from typing import List
 import jwt
-from jose import JWTError  # Importado para capturar a exceção do token JWT
+from jose import JWTError  # Importado para capturar a exceÃ§Ã£o do token JWT
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from datetime import datetime, timedelta, timezone
 
-# Importação única e correta do banco de dados
+# ImportaÃ§Ã£o Ãºnica e correta do banco de dados
 from app.core.database import Base, engine, get_db
 from app.core.security import (
     ALGORITHM,
     SECRET_KEY,
     criar_token_acesso,
+    gerar_codigo_recuperacao,
+    gerar_hash_codigo_recuperacao,
     gerar_hash_senha,
     verificar_senha,
 )
 
-# Modelos para criação das tabelas no Banco de Dados
+# Modelos para criaÃ§Ã£o das tabelas no Banco de Dados
 from app.models.clinic import ClinicaModel
 from app.models.consultation import ConsultaModel
 from app.models.patient import PacienteModel
 from app.models.user import UsuarioModel
+from app.models.password_reset_code import PasswordResetCodeModel
 
 # Schemas
 from app.schemas.consultation import ConsultaCreate, ConsultaResponse
 from app.schemas.patient import PacienteCreate, PacienteResponse
+from app.schemas.password_reset import (
+    MensagemRecuperacaoResponse,
+    SolicitarRecuperacaoSenhaRequest,
+)
 from app.schemas.user import (
     PrimeiroCadastro,
     PrimeiroCadastroResponse,
@@ -36,10 +44,10 @@ from app.schemas.user import (
     UsuarioResponse,
 )
 
-# Criar tabelas na inicialização
+# Criar tabelas na inicializaÃ§Ã£o
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Prontuário Eletrônico API", version="1.0.0")
+app = FastAPI(title="ProntuÃ¡rio EletrÃ´nico API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,7 +66,7 @@ def obter_usuario_atual(
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Não foi possível validar as credenciais",
+        detail="NÃ£o foi possÃ­vel validar as credenciais",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -82,10 +90,10 @@ def obter_usuario_atual(
 
 @app.get("/")
 def home():
-    return {"mensagem": "API de Prontuário Eletrônico rodando com sucesso!"}
+    return {"mensagem": "API de ProntuÃ¡rio EletrÃ´nico rodando com sucesso!"}
 
 
-# ==================== AUTENTICAÇÃO E USUÁRIOS ====================
+# ==================== AUTENTICAÃ‡ÃƒO E USUÃRIOS ====================
 
 
 @app.post(
@@ -104,7 +112,7 @@ def primeiro_cadastro(
     ):
         raise HTTPException(
             status_code=400,
-            detail="E-mail já cadastrado no sistema.",
+            detail="E-mail jÃ¡ cadastrado no sistema.",
         )
 
     if (
@@ -114,7 +122,7 @@ def primeiro_cadastro(
     ):
         raise HTTPException(
             status_code=400,
-            detail="CNPJ já cadastrado no sistema.",
+            detail="CNPJ jÃ¡ cadastrado no sistema.",
         )
 
     try:
@@ -124,7 +132,7 @@ def primeiro_cadastro(
         )
         db.add(nova_clinica)
 
-        # Obtém o ID da clínica sem confirmar a transação.
+        # ObtÃ©m o ID da clÃ­nica sem confirmar a transaÃ§Ã£o.
         db.flush()
 
         novo_responsavel = UsuarioModel(
@@ -153,7 +161,7 @@ def primeiro_cadastro(
         db.rollback()
         raise HTTPException(
             status_code=400,
-            detail="Não foi possível concluir o cadastro.",
+            detail="NÃ£o foi possÃ­vel concluir o cadastro.",
         )
 
 
@@ -170,19 +178,19 @@ def criar_usuario(
     if usuario_atual.cargo != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Apenas administradores podem criar usuários.",
+            detail="Apenas administradores podem criar usuÃ¡rios.",
         )
 
     if usuario.cargo == "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Não é permitido criar outro administrador.",
+            detail="NÃ£o Ã© permitido criar outro administrador.",
         )
 
     if db.query(UsuarioModel).filter(UsuarioModel.email == usuario.email).first():
         raise HTTPException(
             status_code=400,
-            detail="E-mail já cadastrado no sistema.",
+            detail="E-mail jÃ¡ cadastrado no sistema.",
         )
 
     novo_usuario = UsuarioModel(
@@ -204,7 +212,7 @@ def criar_usuario(
         db.rollback()
         raise HTTPException(
             status_code=400,
-            detail="Não foi possível criar o usuário.",
+            detail="NÃ£o foi possÃ­vel criar o usuÃ¡rio.",
         )
 
 
@@ -229,7 +237,7 @@ def login(
     if not usuario.ativo:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário inativo.",
+            detail="UsuÃ¡rio inativo.",
         )
 
     access_token = criar_token_acesso(data={"sub": usuario.email})
@@ -240,15 +248,60 @@ def login(
     }
 
 
+@app.post(
+    "/api/auth/recuperacao-senha/solicitar",
+    response_model=MensagemRecuperacaoResponse,
+)
+def solicitar_recuperacao_senha(
+    dados: SolicitarRecuperacaoSenhaRequest,
+    db: Session = Depends(get_db),
+):
+    mensagem = {
+        "mensagem": (
+            "Se os dados informados estiverem cadastrados, "
+            "um cÃ³digo serÃ¡ enviado pelo WhatsApp."
+        )
+    }
+
+    usuario = (
+        db.query(UsuarioModel).filter(UsuarioModel.email == str(dados.email)).first()
+    )
+
+    if not usuario or not usuario.ativo or not usuario.whatsapp:
+        return mensagem
+
+    agora = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # Invalida cÃ³digos anteriores ainda nÃ£o utilizados.
+    db.query(PasswordResetCodeModel).filter(
+        PasswordResetCodeModel.usuario_id == usuario.id,
+        PasswordResetCodeModel.used_at.is_(None),
+    ).update(
+        {"used_at": agora},
+        synchronize_session=False,
+    )
+
+    codigo = gerar_codigo_recuperacao()
+
+    novo_codigo = PasswordResetCodeModel(
+        usuario_id=usuario.id,
+        codigo_hash=gerar_hash_codigo_recuperacao(codigo),
+        expires_at=agora + timedelta(minutes=10),
+        tentativas=0,
+    )
+
+    db.add(novo_codigo)
+    db.commit()
+
+    return mensagem
+
+
 @app.get("/api/usuarios/me", response_model=UsuarioResponse)
 def obter_meu_perfil(usuario_atual: UsuarioModel = Depends(obter_usuario_atual)):
     return usuario_atual
 
 
-# ==================== CLÍNICAS ====================
-
-
-# ==================== PACIENTES ====================
+# ==================================== PACIENTES ====================
 
 
 @app.post(
@@ -277,7 +330,7 @@ def criar_paciente(
         db.rollback()
         raise HTTPException(
             status_code=400,
-            detail="Já existe um paciente cadastrado com este CPF.",
+            detail="JÃ¡ existe um paciente cadastrado com este CPF.",
         )
 
 
@@ -293,7 +346,7 @@ def listar_pacientes(
     )
 
 
-# ==================== CONSULTAS E PRONTUÁRIO ====================
+# ==================== CONSULTAS E PRONTUÃRIO ====================
 
 
 @app.post(
@@ -309,7 +362,7 @@ def registrar_consulta(
     if usuario_atual.cargo == "recepcao":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="A recepção não pode registrar consultas.",
+            detail="A recepÃ§Ã£o nÃ£o pode registrar consultas.",
         )
 
     paciente = (
@@ -324,7 +377,7 @@ def registrar_consulta(
     if not paciente:
         raise HTTPException(
             status_code=404,
-            detail="Paciente não encontrado.",
+            detail="Paciente nÃ£o encontrado.",
         )
 
     nova_consulta = ConsultaModel(
@@ -345,7 +398,7 @@ def registrar_consulta(
         db.rollback()
     raise HTTPException(
         status_code=400,
-        detail="Não foi possível registrar a consulta.",
+        detail="NÃ£o foi possÃ­vel registrar a consulta.",
     )
 
     return nova_consulta
@@ -363,7 +416,7 @@ def obter_prontuario_paciente(
     if usuario_atual.cargo == "recepcao":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="A recepção não pode acessar prontuários.",
+            detail="A recepÃ§Ã£o nÃ£o pode acessar prontuÃ¡rios.",
         )
 
     paciente = (
@@ -378,7 +431,7 @@ def obter_prontuario_paciente(
     if not paciente:
         raise HTTPException(
             status_code=404,
-            detail="Paciente não encontrado.",
+            detail="Paciente nÃ£o encontrado.",
         )
 
     return (
