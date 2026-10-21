@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 # Importação única e correta do banco de dados
 from app.core.database import Base, engine, get_db
@@ -15,6 +15,8 @@ from app.core.security import (
     ALGORITHM,
     SECRET_KEY,
     criar_token_acesso,
+    gerar_codigo_recuperacao,
+    gerar_hash_codigo_recuperacao,
     gerar_hash_senha,
     verificar_senha,
 )
@@ -25,6 +27,7 @@ from app.models.clinic import ClinicaModel
 from app.models.consultation import ConsultaModel
 from app.models.patient import PacienteModel
 from app.models.user import UsuarioModel
+from app.models.password_reset_code import PasswordResetCodeModel
 
 # Schemas
 from app.schemas.consultation import (
@@ -33,6 +36,10 @@ from app.schemas.consultation import (
     ConsultaResponse,
 )
 from app.schemas.patient import PacienteCreate, PacienteResponse
+from app.schemas.password_reset import (
+    MensagemRecuperacaoResponse,
+    SolicitarRecuperacaoSenhaRequest,
+)
 from app.schemas.user import (
     PrimeiroCadastro,
     PrimeiroCadastroResponse,
@@ -251,15 +258,60 @@ def login(
     }
 
 
+@app.post(
+    "/api/auth/recuperacao-senha/solicitar",
+    response_model=MensagemRecuperacaoResponse,
+)
+def solicitar_recuperacao_senha(
+    dados: SolicitarRecuperacaoSenhaRequest,
+    db: Session = Depends(get_db),
+):
+    mensagem = {
+        "mensagem": (
+            "Se os dados informados estiverem cadastrados, "
+            "um código será enviado pelo WhatsApp."
+        )
+    }
+
+    usuario = (
+        db.query(UsuarioModel).filter(UsuarioModel.email == str(dados.email)).first()
+    )
+
+    if not usuario or not usuario.ativo or not usuario.whatsapp:
+        return mensagem
+
+    agora = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # Invalida códigos anteriores ainda não utilizados.
+    db.query(PasswordResetCodeModel).filter(
+        PasswordResetCodeModel.usuario_id == usuario.id,
+        PasswordResetCodeModel.used_at.is_(None),
+    ).update(
+        {"used_at": agora},
+        synchronize_session=False,
+    )
+
+    codigo = gerar_codigo_recuperacao()
+
+    novo_codigo = PasswordResetCodeModel(
+        usuario_id=usuario.id,
+        codigo_hash=gerar_hash_codigo_recuperacao(codigo),
+        expires_at=agora + timedelta(minutes=10),
+        tentativas=0,
+    )
+
+    db.add(novo_codigo)
+    db.commit()
+
+    return mensagem
+
+
 @app.get("/api/usuarios/me", response_model=UsuarioResponse)
 def obter_meu_perfil(usuario_atual: UsuarioModel = Depends(obter_usuario_atual)):
     return usuario_atual
 
 
-# ==================== CLÍNICAS ====================
-
-
-# ==================== PACIENTES ====================
+# ==================================== PACIENTES ====================
 
 
 @app.post(

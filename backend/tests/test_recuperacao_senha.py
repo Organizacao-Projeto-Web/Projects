@@ -1,0 +1,156 @@
+from datetime import datetime, timedelta, timezone
+
+from app.models.password_reset_code import PasswordResetCodeModel
+from app.models.user import UsuarioModel
+
+MENSAGEM_GENERICA = {
+    "mensagem": (
+        "Se os dados informados estiverem cadastrados, "
+        "um código será enviado pelo WhatsApp."
+    )
+}
+
+
+def criar_conta(client):
+    response = client.post(
+        "/api/cadastro",
+        json={
+            "clinica": {
+                "nome": "Clínica Recuperação",
+                "cnpj": "12345678000195",
+            },
+            "responsavel": {
+                "nome": "Administrador Recuperação",
+                "email": "recuperacao@example.com",
+                "whatsapp": "5575999999999",
+                "senha": "SenhaTeste123!",
+                "crefito": "12345-F",
+            },
+        },
+    )
+
+    assert response.status_code == 201, response.json()
+
+    return response.json()
+
+
+def test_solicitar_recuperacao_cria_codigo(client, app_context):
+    _, TestSessionLocal = app_context
+
+    criar_conta(client)
+
+    response = client.post(
+        "/api/auth/recuperacao-senha/solicitar",
+        json={
+            "email": "recuperacao@example.com",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == MENSAGEM_GENERICA
+
+    db = TestSessionLocal()
+
+    try:
+        usuario = (
+            db.query(UsuarioModel)
+            .filter(UsuarioModel.email == "recuperacao@example.com")
+            .first()
+        )
+
+        codigo = (
+            db.query(PasswordResetCodeModel)
+            .filter(PasswordResetCodeModel.usuario_id == usuario.id)
+            .first()
+        )
+
+        assert codigo is not None
+        assert codigo.codigo_hash
+        assert codigo.tentativas == 0
+        assert codigo.used_at is None
+
+        agora = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        assert codigo.expires_at > agora
+        assert codigo.expires_at <= agora + timedelta(minutes=11)
+
+    finally:
+        db.close()
+
+
+def test_solicitar_recuperacao_nao_revela_email_inexistente(
+    client,
+    app_context,
+):
+    _, TestSessionLocal = app_context
+
+    response = client.post(
+        "/api/auth/recuperacao-senha/solicitar",
+        json={
+            "email": "naoexiste@example.com",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == MENSAGEM_GENERICA
+
+    db = TestSessionLocal()
+
+    try:
+        quantidade = db.query(PasswordResetCodeModel).count()
+
+        assert quantidade == 0
+
+    finally:
+        db.close()
+
+
+def test_nova_solicitacao_invalida_codigo_anterior(
+    client,
+    app_context,
+):
+    _, TestSessionLocal = app_context
+
+    criar_conta(client)
+
+    primeira = client.post(
+        "/api/auth/recuperacao-senha/solicitar",
+        json={
+            "email": "recuperacao@example.com",
+        },
+    )
+
+    assert primeira.status_code == 200
+
+    segunda = client.post(
+        "/api/auth/recuperacao-senha/solicitar",
+        json={
+            "email": "recuperacao@example.com",
+        },
+    )
+
+    assert segunda.status_code == 200
+
+    db = TestSessionLocal()
+
+    try:
+        usuario = (
+            db.query(UsuarioModel)
+            .filter(UsuarioModel.email == "recuperacao@example.com")
+            .first()
+        )
+
+        codigos = (
+            db.query(PasswordResetCodeModel)
+            .filter(PasswordResetCodeModel.usuario_id == usuario.id)
+            .order_by(PasswordResetCodeModel.id.asc())
+            .all()
+        )
+
+        assert len(codigos) == 2
+
+        assert codigos[0].used_at is not None
+        assert codigos[1].used_at is None
+
+    finally:
+        db.close()
