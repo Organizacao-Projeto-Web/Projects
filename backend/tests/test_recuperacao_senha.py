@@ -300,3 +300,115 @@ def test_codigo_e_invalidado_apos_cinco_tentativas(
 
     finally:
         db.close()
+
+
+def obter_reset_token(client, TestSessionLocal):
+    criar_conta(client)
+
+    criar_codigo_teste(
+        TestSessionLocal,
+        "recuperacao@example.com",
+        codigo="123456",
+    )
+
+    response = client.post(
+        "/api/auth/recuperacao-senha/verificar",
+        json={
+            "email": "recuperacao@example.com",
+            "codigo": "123456",
+        },
+    )
+
+    assert response.status_code == 200
+
+    return response.json()["reset_token"]
+
+
+def test_redefinir_senha_com_token_valido(
+    client,
+    app_context,
+):
+    _, TestSessionLocal = app_context
+
+    reset_token = obter_reset_token(
+        client,
+        TestSessionLocal,
+    )
+
+    response = client.post(
+        "/api/auth/recuperacao-senha/redefinir",
+        json={
+            "reset_token": reset_token,
+            "nova_senha": "NovaSenha123!",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"mensagem": "Senha redefinida com sucesso."}
+
+    login_antigo = client.post(
+        "/api/auth/login",
+        data={
+            "username": "recuperacao@example.com",
+            "password": "SenhaTeste123!",
+        },
+    )
+
+    assert login_antigo.status_code == 401
+
+    login_novo = client.post(
+        "/api/auth/login",
+        data={
+            "username": "recuperacao@example.com",
+            "password": "NovaSenha123!",
+        },
+    )
+
+    assert login_novo.status_code == 200
+    assert login_novo.json()["access_token"]
+
+
+def test_reset_token_nao_pode_ser_reutilizado(
+    client,
+    app_context,
+):
+    _, TestSessionLocal = app_context
+
+    reset_token = obter_reset_token(
+        client,
+        TestSessionLocal,
+    )
+
+    primeira = client.post(
+        "/api/auth/recuperacao-senha/redefinir",
+        json={
+            "reset_token": reset_token,
+            "nova_senha": "NovaSenha123!",
+        },
+    )
+
+    assert primeira.status_code == 200
+
+    segunda = client.post(
+        "/api/auth/recuperacao-senha/redefinir",
+        json={
+            "reset_token": reset_token,
+            "nova_senha": "OutraSenha123!",
+        },
+    )
+
+    assert segunda.status_code == 400
+    assert segunda.json() == {"detail": "Token de redefinição inválido ou expirado."}
+
+
+def test_redefinir_senha_rejeita_token_invalido(client):
+    response = client.post(
+        "/api/auth/recuperacao-senha/redefinir",
+        json={
+            "reset_token": "token-invalido-que-nao-e-jwt",
+            "nova_senha": "NovaSenha123!",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Token de redefinição inválido ou expirado."}

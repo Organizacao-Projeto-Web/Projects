@@ -37,6 +37,7 @@ from app.schemas.password_reset import (
     SolicitarRecuperacaoSenhaRequest,
     TokenRedefinicaoSenhaResponse,
     VerificarCodigoRecuperacaoRequest,
+    RedefinirSenhaRequest,
 )
 from app.schemas.user import (
     PrimeiroCadastro,
@@ -378,6 +379,7 @@ def verificar_codigo_recuperacao_senha(
         data={
             "sub": "password_reset",
             "uid": usuario.id,
+            "rid": codigo_registro.id,
             "purpose": "password_reset",
         },
         expires_delta=timedelta(minutes=10),
@@ -386,6 +388,81 @@ def verificar_codigo_recuperacao_senha(
     return {
         "reset_token": reset_token,
     }
+
+
+@app.post(
+    "/api/auth/recuperacao-senha/redefinir",
+    response_model=MensagemRecuperacaoResponse,
+)
+def redefinir_senha(
+    dados: RedefinirSenhaRequest,
+    db: Session = Depends(get_db),
+):
+    mensagem_erro = "Token de redefinição inválido ou expirado."
+
+    try:
+        payload = jwt.decode(
+            dados.reset_token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+        )
+    except jwt.PyJWTError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    if (
+        payload.get("sub") != "password_reset"
+        or payload.get("purpose") != "password_reset"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    usuario_id = payload.get("uid")
+    recuperacao_id = payload.get("rid")
+
+    if not usuario_id or not recuperacao_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    usuario = (
+        db.query(UsuarioModel)
+        .filter(
+            UsuarioModel.id == usuario_id,
+            UsuarioModel.ativo.is_(True),
+        )
+        .first()
+    )
+
+    recuperacao = (
+        db.query(PasswordResetCodeModel)
+        .filter(
+            PasswordResetCodeModel.id == recuperacao_id,
+            PasswordResetCodeModel.usuario_id == usuario_id,
+        )
+        .first()
+    )
+
+    if not usuario or not recuperacao or recuperacao.used_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    usuario.senha_hash = gerar_hash_senha(dados.nova_senha)
+
+    # Remove o registro utilizado.
+    # Assim, o mesmo reset_token não poderá ser reutilizado.
+    db.delete(recuperacao)
+
+    db.commit()
+
+    return {"mensagem": "Senha redefinida com sucesso."}
 
 
 @app.get("/api/usuarios/me", response_model=UsuarioResponse)
