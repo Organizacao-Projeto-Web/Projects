@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.models.password_reset_code import PasswordResetCodeModel
 from app.models.user import UsuarioModel
+from app.core.security import gerar_hash_codigo_recuperacao
 
 MENSAGEM_GENERICA = {
     "mensagem": (
@@ -151,6 +152,151 @@ def test_nova_solicitacao_invalida_codigo_anterior(
 
         assert codigos[0].used_at is not None
         assert codigos[1].used_at is None
+
+    finally:
+        db.close()
+
+
+def criar_codigo_teste(
+    TestSessionLocal,
+    email,
+    codigo="123456",
+):
+    db = TestSessionLocal()
+
+    try:
+        usuario = db.query(UsuarioModel).filter(UsuarioModel.email == email).first()
+
+        registro = PasswordResetCodeModel(
+            usuario_id=usuario.id,
+            codigo_hash=gerar_hash_codigo_recuperacao(codigo),
+            expires_at=(
+                datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=10)
+            ),
+            tentativas=0,
+        )
+
+        db.add(registro)
+        db.commit()
+        db.refresh(registro)
+
+        return registro.id
+
+    finally:
+        db.close()
+
+
+def test_verificar_codigo_correto_gera_reset_token(
+    client,
+    app_context,
+):
+    _, TestSessionLocal = app_context
+
+    criar_conta(client)
+
+    codigo_id = criar_codigo_teste(
+        TestSessionLocal,
+        "recuperacao@example.com",
+    )
+
+    response = client.post(
+        "/api/auth/recuperacao-senha/verificar",
+        json={
+            "email": "recuperacao@example.com",
+            "codigo": "123456",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["reset_token"]
+
+    db = TestSessionLocal()
+
+    try:
+        registro = db.get(
+            PasswordResetCodeModel,
+            codigo_id,
+        )
+
+        assert registro.used_at is not None
+
+    finally:
+        db.close()
+
+
+def test_codigo_incorreto_aumenta_tentativas(
+    client,
+    app_context,
+):
+    _, TestSessionLocal = app_context
+
+    criar_conta(client)
+
+    codigo_id = criar_codigo_teste(
+        TestSessionLocal,
+        "recuperacao@example.com",
+    )
+
+    response = client.post(
+        "/api/auth/recuperacao-senha/verificar",
+        json={
+            "email": "recuperacao@example.com",
+            "codigo": "999999",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Código inválido ou expirado."}
+
+    db = TestSessionLocal()
+
+    try:
+        registro = db.get(
+            PasswordResetCodeModel,
+            codigo_id,
+        )
+
+        assert registro.tentativas == 1
+        assert registro.used_at is None
+
+    finally:
+        db.close()
+
+
+def test_codigo_e_invalidado_apos_cinco_tentativas(
+    client,
+    app_context,
+):
+    _, TestSessionLocal = app_context
+
+    criar_conta(client)
+
+    codigo_id = criar_codigo_teste(
+        TestSessionLocal,
+        "recuperacao@example.com",
+    )
+
+    for _ in range(5):
+        response = client.post(
+            "/api/auth/recuperacao-senha/verificar",
+            json={
+                "email": "recuperacao@example.com",
+                "codigo": "999999",
+            },
+        )
+
+        assert response.status_code == 400
+
+    db = TestSessionLocal()
+
+    try:
+        registro = db.get(
+            PasswordResetCodeModel,
+            codigo_id,
+        )
+
+        assert registro.tentativas == 5
+        assert registro.used_at is not None
 
     finally:
         db.close()
