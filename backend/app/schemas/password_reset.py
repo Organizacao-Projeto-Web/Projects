@@ -24,3 +24,16 @@ class VerificarCodigoRecuperacaoRequest(BaseModel):
 
 class TokenRedefinicaoSenhaResponse(BaseModel):
     reset_token: str
+
+
+class RedefinirSenhaRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reset_token: str = Field(
+        min_length=20,
+    )
+
+    nova_senha: str = Field(
+        min_length=8,
+        max_length=128,
+    )
