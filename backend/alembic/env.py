@@ -8,6 +8,7 @@ from app.core.database import Base, DATABASE_URL, engine
 from app.models.clinic import ClinicaModel
 from app.models.consultation import ConsultaModel
 from app.models.patient import PacienteModel
+from app.models.password_reset_code import PasswordResetCodeModel
 from app.models.user import UsuarioModel
 
 config = context.config
