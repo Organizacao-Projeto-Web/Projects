@@ -1,3 +1,4 @@
+import pytest
 from datetime import datetime, timedelta, timezone
 
 from app.models.password_reset_code import PasswordResetCodeModel
@@ -10,6 +11,23 @@ MENSAGEM_GENERICA = {
         "um código será enviado pelo WhatsApp."
     )
 }
+
+
+@pytest.fixture(autouse=True)
+def simular_envio_whatsapp(monkeypatch):
+    def envio_mock(numero: str, codigo: str):
+        return {
+            "messages": [
+                {
+                    "id": "mensagem-teste",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        "app.main.enviar_codigo_recuperacao",
+        envio_mock,
+    )
 
 
 def criar_conta(client):

@@ -21,6 +21,10 @@ from app.core.security import (
     verificar_codigo_recuperacao,
     verificar_senha,
 )
+from app.core.whatsapp import (
+    WhatsAppEnvioError,
+    enviar_codigo_recuperacao,
+)
 
 # Modelos para criação das tabelas no Banco de Dados
 from app.models.appointment import AgendamentoModel
@@ -305,7 +309,16 @@ def solicitar_recuperacao_senha(
     )
 
     db.add(novo_codigo)
-    db.commit()
+
+    try:
+        db.flush()  # valida antes de chamar um serviço externo
+
+        enviar_codigo_recuperacao(usuario.whatsapp, codigo)
+
+        db.commit()
+
+    except WhatsAppEnvioError:
+        db.rollback()
 
     return mensagem
 

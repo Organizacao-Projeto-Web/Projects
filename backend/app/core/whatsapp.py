@@ -1,8 +1,15 @@
 import os
 import re
+from urllib import response
 
 import httpx
 from dotenv import load_dotenv
+from sqlalchemy import exc
+
+
+class WhatsAppEnvioError(RuntimeError):
+    pass
+
 
 load_dotenv()
 
@@ -18,13 +25,13 @@ def _obter_configuracao():
     )
 
     if not access_token:
-        raise RuntimeError("WHATSAPP_ACCESS_TOKEN não configurado.")
+        raise WhatsAppEnvioError("WHATSAPP_ACCESS_TOKEN não configurado.")
 
     if not phone_number_id:
-        raise RuntimeError("WHATSAPP_PHONE_NUMBER_ID não configurado.")
+        raise WhatsAppEnvioError("WHATSAPP_PHONE_NUMBER_ID não configurado.")
 
     if not template_name:
-        raise RuntimeError("WHATSAPP_TEMPLATE_NAME não configurado.")
+        raise WhatsAppEnvioError("WHATSAPP_TEMPLATE_NAME não configurado.")
 
     return {
         "access_token": access_token,
@@ -93,13 +100,17 @@ def enviar_codigo_recuperacao(
         },
     }
 
-    response = httpx.post(
-        url,
-        headers=headers,
-        json=payload,
-        timeout=10.0,
-    )
+    try:
+        response = httpx.post(
+            url,
+            headers=headers,
+            json=payload,
+            timeout=10.0,
+        )
 
-    response.raise_for_status()
+        response.raise_for_status()
+
+    except httpx.RequestError as exc:
+        raise WhatsAppEnvioError("Falha ao enviar o código pelo whatsapp.") from exc
 
     return response.json()
