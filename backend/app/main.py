@@ -2,15 +2,21 @@ from typing import List
 import jwt
 from jose import JWTError  # Importado para capturar a exceção do token JWT
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta, timezone
 
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
 # Importação única e correta do banco de dados
 from app.core.database import Base, engine, get_db
+from app.core.email import EmailEnvioError, enviar_codigo_recuperacao
 from app.core.security import (
     ALGORITHM,
     SECRET_KEY,
@@ -63,6 +69,12 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Prontuário Eletrônico API", version="1.0.0")
 
+# Proteção contra excesso de requisições
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+
+# Permissão de comunicação com o frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -266,14 +278,16 @@ def login(
     "/api/auth/recuperacao-senha/solicitar",
     response_model=MensagemRecuperacaoResponse,
 )
+@limiter.limit("5/minute")
 def solicitar_recuperacao_senha(
+    request: Request,
     dados: SolicitarRecuperacaoSenhaRequest,
     db: Session = Depends(get_db),
 ):
     mensagem = {
         "mensagem": (
             "Se os dados informados estiverem cadastrados, "
-            "um código será enviado pelo WhatsApp."
+            "um código será enviado por e-mail."
         )
     }
 
@@ -281,10 +295,22 @@ def solicitar_recuperacao_senha(
         db.query(UsuarioModel).filter(UsuarioModel.email == str(dados.email)).first()
     )
 
-    if not usuario or not usuario.ativo or not usuario.whatsapp:
+    if not usuario or not usuario.ativo:
         return mensagem
 
     agora = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    ultima_solicitacao = (
+        db.query(PasswordResetCodeModel)
+        .filter(PasswordResetCodeModel.usuario_id == usuario.id)
+        .order_by(PasswordResetCodeModel.created_at.desc())
+        .first()
+    )
+
+    if ultima_solicitacao and ultima_solicitacao.created_at > agora - timedelta(
+        seconds=60
+    ):
+        return mensagem
 
     # Invalida códigos anteriores ainda não utilizados.
     db.query(PasswordResetCodeModel).filter(
@@ -304,8 +330,21 @@ def solicitar_recuperacao_senha(
         tentativas=0,
     )
 
-    db.add(novo_codigo)
-    db.commit()
+    try:
+        db.add(novo_codigo)
+        db.flush()
+
+        # Envia o código pelo Gmail.
+        enviar_codigo_recuperacao(usuario.email, codigo)
+
+        db.commit()
+
+    except EmailEnvioError:
+        db.rollback()
+
+    except Exception:
+        db.rollback()
+        raise
 
     return mensagem
 
