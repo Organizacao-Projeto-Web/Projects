@@ -2,19 +2,29 @@ from typing import List
 import jwt
 from jose import JWTError  # Importado para capturar a exceção do token JWT
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from datetime import datetime, timedelta, timezone
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 # Importação única e correta do banco de dados
 from app.core.database import Base, engine, get_db
+from app.core.email import EmailEnvioError, enviar_codigo_recuperacao
 from app.core.security import (
     ALGORITHM,
     SECRET_KEY,
     criar_token_acesso,
+    gerar_codigo_recuperacao,
+    gerar_hash_codigo_recuperacao,
     gerar_hash_senha,
+    verificar_codigo_recuperacao,
     verificar_senha,
 )
 
@@ -23,10 +33,18 @@ from app.models.clinic import ClinicaModel
 from app.models.consultation import ConsultaModel
 from app.models.patient import PacienteModel
 from app.models.user import UsuarioModel
+from app.models.password_reset_code import PasswordResetCodeModel
 
 # Schemas
 from app.schemas.consultation import ConsultaCreate, ConsultaResponse
 from app.schemas.patient import PacienteCreate, PacienteResponse
+from app.schemas.password_reset import (
+    MensagemRecuperacaoResponse,
+    SolicitarRecuperacaoSenhaRequest,
+    TokenRedefinicaoSenhaResponse,
+    VerificarCodigoRecuperacaoRequest,
+    RedefinirSenhaRequest,
+)
 from app.schemas.user import (
     PrimeiroCadastro,
     PrimeiroCadastroResponse,
@@ -41,6 +59,12 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Prontuário Eletrônico API", version="1.0.0")
 
+# Proteção contra excesso de requisições
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+
+# Permissão de comunicação com o frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -85,7 +109,7 @@ def home():
     return {"mensagem": "API de Prontuário Eletrônico rodando com sucesso!"}
 
 
-# ==================== AUTENTICAÇÃO E USUÁRIOS ====================
+# ==================== AUTENTICAÃ‡ÃƒO E USUÃRIOS ====================
 
 
 @app.post(
@@ -130,6 +154,7 @@ def primeiro_cadastro(
         novo_responsavel = UsuarioModel(
             nome=cadastro.responsavel.nome,
             email=cadastro.responsavel.email,
+            whatsapp=cadastro.responsavel.whatsapp,
             senha_hash=gerar_hash_senha(cadastro.responsavel.senha),
             crefito=cadastro.responsavel.crefito,
             cargo="admin",
@@ -138,7 +163,6 @@ def primeiro_cadastro(
 
         db.add(novo_responsavel)
 
-        # Clínica e responsável são gravados juntos.
         db.commit()
 
         db.refresh(nova_clinica)
@@ -188,6 +212,7 @@ def criar_usuario(
     novo_usuario = UsuarioModel(
         nome=usuario.nome,
         email=usuario.email,
+        whatsapp=usuario.whatsapp,
         senha_hash=gerar_hash_senha(usuario.senha),
         crefito=usuario.crefito,
         cargo=usuario.cargo,
@@ -239,15 +264,252 @@ def login(
     }
 
 
+@app.post(
+    "/api/auth/recuperacao-senha/solicitar",
+    response_model=MensagemRecuperacaoResponse,
+)
+@limiter.limit("5/minute")
+def solicitar_recuperacao_senha(
+    request: Request,
+    dados: SolicitarRecuperacaoSenhaRequest,
+    db: Session = Depends(get_db),
+):
+    mensagem = {
+        "mensagem": (
+            "Se os dados informados estiverem cadastrados, "
+            "um código será enviado por e-mail."
+        )
+    }
+
+    usuario = (
+        db.query(UsuarioModel).filter(UsuarioModel.email == str(dados.email)).first()
+    )
+
+    if not usuario or not usuario.ativo:
+        return mensagem
+
+    agora = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    ultima_solicitacao = (
+        db.query(PasswordResetCodeModel)
+        .filter(PasswordResetCodeModel.usuario_id == usuario.id)
+        .order_by(PasswordResetCodeModel.created_at.desc())
+        .first()
+    )
+
+    if ultima_solicitacao and ultima_solicitacao.created_at > agora - timedelta(
+        seconds=60
+    ):
+        return mensagem
+
+    # Invalida códigos anteriores ainda não utilizados.
+    db.query(PasswordResetCodeModel).filter(
+        PasswordResetCodeModel.usuario_id == usuario.id,
+        PasswordResetCodeModel.used_at.is_(None),
+    ).update(
+        {"used_at": agora},
+        synchronize_session=False,
+    )
+
+    codigo = gerar_codigo_recuperacao()
+
+    novo_codigo = PasswordResetCodeModel(
+        usuario_id=usuario.id,
+        codigo_hash=gerar_hash_codigo_recuperacao(codigo),
+        expires_at=agora + timedelta(minutes=10),
+        tentativas=0,
+    )
+
+    try:
+        db.add(novo_codigo)
+        db.flush()
+
+        # Envia o código pelo Gmail.
+        enviar_codigo_recuperacao(usuario.email, codigo)
+
+        db.commit()
+
+    except EmailEnvioError:
+        db.rollback()
+
+    except Exception:
+        db.rollback()
+        raise
+
+    return mensagem
+
+
+@app.post(
+    "/api/auth/recuperacao-senha/verificar",
+    response_model=TokenRedefinicaoSenhaResponse,
+)
+def verificar_codigo_recuperacao_senha(
+    dados: VerificarCodigoRecuperacaoRequest,
+    db: Session = Depends(get_db),
+):
+    usuario = (
+        db.query(UsuarioModel).filter(UsuarioModel.email == str(dados.email)).first()
+    )
+
+    mensagem_erro = "Código inválido ou expirado."
+
+    if not usuario or not usuario.ativo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    codigo_registro = (
+        db.query(PasswordResetCodeModel)
+        .filter(
+            PasswordResetCodeModel.usuario_id == usuario.id,
+            PasswordResetCodeModel.used_at.is_(None),
+        )
+        .order_by(PasswordResetCodeModel.id.desc())
+        .first()
+    )
+
+    if not codigo_registro:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    agora = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    if codigo_registro.expires_at <= agora:
+        codigo_registro.used_at = agora
+        db.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    if codigo_registro.tentativas >= 5:
+        codigo_registro.used_at = agora
+        db.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    if not verificar_codigo_recuperacao(
+        dados.codigo,
+        codigo_registro.codigo_hash,
+    ):
+        codigo_registro.tentativas += 1
+
+        if codigo_registro.tentativas >= 5:
+            codigo_registro.used_at = agora
+
+        db.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    codigo_registro.used_at = agora
+    db.commit()
+
+    reset_token = criar_token_acesso(
+        data={
+            "sub": "password_reset",
+            "uid": usuario.id,
+            "rid": codigo_registro.id,
+            "purpose": "password_reset",
+        },
+        expires_delta=timedelta(minutes=10),
+    )
+
+    return {
+        "reset_token": reset_token,
+    }
+
+
+@app.post(
+    "/api/auth/recuperacao-senha/redefinir",
+    response_model=MensagemRecuperacaoResponse,
+)
+def redefinir_senha(
+    dados: RedefinirSenhaRequest,
+    db: Session = Depends(get_db),
+):
+    mensagem_erro = "Token de redefinição inválido ou expirado."
+
+    try:
+        payload = jwt.decode(
+            dados.reset_token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+        )
+    except jwt.PyJWTError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    if (
+        payload.get("sub") != "password_reset"
+        or payload.get("purpose") != "password_reset"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    usuario_id = payload.get("uid")
+    recuperacao_id = payload.get("rid")
+
+    if not usuario_id or not recuperacao_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    usuario = (
+        db.query(UsuarioModel)
+        .filter(
+            UsuarioModel.id == usuario_id,
+            UsuarioModel.ativo.is_(True),
+        )
+        .first()
+    )
+
+    recuperacao = (
+        db.query(PasswordResetCodeModel)
+        .filter(
+            PasswordResetCodeModel.id == recuperacao_id,
+            PasswordResetCodeModel.usuario_id == usuario_id,
+        )
+        .first()
+    )
+
+    if not usuario or not recuperacao or recuperacao.used_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=mensagem_erro,
+        )
+
+    usuario.senha_hash = gerar_hash_senha(dados.nova_senha)
+
+    # Remove o registro utilizado.
+    # Assim, o mesmo reset_token não poderá ser reutilizado.
+    db.delete(recuperacao)
+
+    db.commit()
+
+    return {"mensagem": "Senha redefinida com sucesso."}
+
+
 @app.get("/api/usuarios/me", response_model=UsuarioResponse)
 def obter_meu_perfil(usuario_atual: UsuarioModel = Depends(obter_usuario_atual)):
     return usuario_atual
 
 
-# ==================== CLÍNICAS ====================
-
-
-# ==================== PACIENTES ====================
+# ==================================== PACIENTES ====================
 
 
 @app.post(
@@ -292,7 +554,7 @@ def listar_pacientes(
     )
 
 
-# ==================== CONSULTAS E PRONTUÁRIO ====================
+# ==================== CONSULTAS E PRONTUÃRIO ====================
 
 
 @app.post(
