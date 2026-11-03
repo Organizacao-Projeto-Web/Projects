@@ -1,5 +1,7 @@
 from typing import List
 import jwt
+import os
+from dotenv import load_dotenv
 from jose import JWTError  # Importado para capturar a exceção do token JWT
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
@@ -37,7 +39,7 @@ from app.models.password_reset_code import PasswordResetCodeModel
 
 # Schemas
 from app.schemas.consultation import ConsultaCreate, ConsultaResponse
-from app.schemas.patient import PacienteCreate, PacienteResponse
+from app.schemas.patient import PacienteCreate, PacienteResponse, PacienteUpdate
 from app.schemas.password_reset import (
     MensagemRecuperacaoResponse,
     SolicitarRecuperacaoSenhaRequest,
@@ -64,10 +66,21 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 
+# Origens permitidas para o frontend
+load_dotenv()
+
+CORS_ORIGINS = [
+    origem.strip()
+    for origem in os.getenv(
+        "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",")
+    if origem.strip()
+]
+
 # Permissão de comunicação com o frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -554,6 +567,82 @@ def listar_pacientes(
     )
 
 
+@app.get(
+    "/api/pacientes/{paciente_id}",
+    response_model=PacienteResponse,
+)
+def obter_paciente(
+    paciente_id: int,
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    paciente = (
+        db.query(PacienteModel)
+        .filter(
+            PacienteModel.id == paciente_id,
+            PacienteModel.clinica_id == usuario_atual.clinica_id,
+        )
+        .first()
+    )
+
+    if not paciente:
+        raise HTTPException(
+            status_code=404,
+            detail="Paciente não encontrado.",
+        )
+
+    return paciente
+
+
+@app.patch(
+    "/api/pacientes/{paciente_id}",
+    response_model=PacienteResponse,
+)
+def atualizar_paciente(
+    paciente_id: int,
+    dados: PacienteUpdate,
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    paciente = (
+        db.query(PacienteModel)
+        .filter(
+            PacienteModel.id == paciente_id,
+            PacienteModel.clinica_id == usuario_atual.clinica_id,
+        )
+        .first()
+    )
+
+    if not paciente:
+        raise HTTPException(
+            status_code=404,
+            detail="Paciente não encontrado.",
+        )
+
+    alteracoes = dados.model_dump(exclude_unset=True)
+
+    if "nome" in alteracoes and alteracoes["nome"] is None:
+        raise HTTPException(
+            status_code=422,
+            detail="O nome da paciente não pode ser nulo.",
+        )
+
+    for campo, valor in alteracoes.items():
+        setattr(paciente, campo, valor)
+
+    try:
+        db.commit()
+        db.refresh(paciente)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="CPF já cadastrado.",
+        )
+
+    return paciente
+
+
 # ==================== CONSULTAS E PRONTUÃRIO ====================
 
 
@@ -604,10 +693,10 @@ def registrar_consulta(
         return nova_consulta
     except IntegrityError:
         db.rollback()
-    raise HTTPException(
-        status_code=400,
-        detail="Não foi possível registrar a consulta.",
-    )
+        raise HTTPException(
+            status_code=400,
+            detail="Não foi possível registrar a consulta.",
+        )
 
     return nova_consulta
 
