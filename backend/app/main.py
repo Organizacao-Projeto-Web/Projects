@@ -39,7 +39,7 @@ from app.models.password_reset_code import PasswordResetCodeModel
 
 # Schemas
 from app.schemas.consultation import ConsultaCreate, ConsultaResponse
-from app.schemas.patient import PacienteCreate, PacienteResponse
+from app.schemas.patient import PacienteCreate, PacienteResponse, PacienteUpdate
 from app.schemas.password_reset import (
     MensagemRecuperacaoResponse,
     SolicitarRecuperacaoSenhaRequest,
@@ -589,6 +589,55 @@ def obter_paciente(
         raise HTTPException(
             status_code=404,
             detail="Paciente não encontrado.",
+        )
+
+    return paciente
+
+
+@app.patch(
+    "/api/pacientes/{paciente_id}",
+    response_model=PacienteResponse,
+)
+def atualizar_paciente(
+    paciente_id: int,
+    dados: PacienteUpdate,
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    paciente = (
+        db.query(PacienteModel)
+        .filter(
+            PacienteModel.id == paciente_id,
+            PacienteModel.clinica_id == usuario_atual.clinica_id,
+        )
+        .first()
+    )
+
+    if not paciente:
+        raise HTTPException(
+            status_code=404,
+            detail="Paciente não encontrado.",
+        )
+
+    alteracoes = dados.model_dump(exclude_unset=True)
+
+    if "nome" in alteracoes and alteracoes["nome"] is None:
+        raise HTTPException(
+            status_code=422,
+            detail="O nome da paciente não pode ser nulo.",
+        )
+
+    for campo, valor in alteracoes.items():
+        setattr(paciente, campo, valor)
+
+    try:
+        db.commit()
+        db.refresh(paciente)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="CPF já cadastrado.",
         )
 
     return paciente

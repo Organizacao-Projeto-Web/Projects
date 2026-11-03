@@ -269,3 +269,140 @@ def test_buscar_paciente_por_id_respeita_clinica(client):
         f"/api/pacientes/{paciente_a['id']}",
     )
     assert response.status_code == 401
+
+
+def test_atualizar_paciente_parcialmente(client):
+    cenario = preparar_cenario(client)
+
+    paciente = cenario["paciente_a"]
+    headers = cenario["headers_a"]
+
+    response = client.patch(
+        f"/api/pacientes/{paciente['id']}",
+        headers=headers,
+        json={"telefone": "75999999999"},
+    )
+
+    print("DETALHES DO ERRO:", response.json())
+
+    assert response.status_code == 200
+
+    atualizado = response.json()
+
+    assert atualizado["id"] == paciente["id"]
+    assert atualizado["nome"] == paciente["nome"]
+    assert atualizado["cpf"] == paciente["cpf"]
+    assert atualizado["telefone"] == "75999999999"
+
+
+def test_atualizacao_paciente_bloqueia_outra_clinica(client):
+    cenario = preparar_cenario(client)
+
+    paciente_b = cenario["paciente_b"]
+    headers_a = cenario["headers_a"]
+    headers_b = cenario["headers_b"]
+
+    telefone_original = paciente_b["telefone"]
+
+    response = client.patch(
+        f"/api/pacientes/{paciente_b['id']}",
+        headers=headers_a,
+        json={"telefone": "75988887777"},
+    )
+
+    assert response.status_code == 404
+
+    # Confirma que o cadastro original não foi alterado.
+    response = client.get(
+        f"/api/pacientes/{paciente_b['id']}",
+        headers=headers_b,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["telefone"] == telefone_original
+
+
+def test_atualizar_paciente_com_cpf_duplicado(client):
+    cenario = preparar_cenario(client)
+
+    paciente_a = cenario["paciente_a"]
+    headers_a = cenario["headers_a"]
+
+    # Cria outra paciente com CPF diferente.
+    response = client.post(
+        "/api/pacientes",
+        headers=headers_a,
+        json={
+            "nome": "Paciente Teste CPF",
+            "cpf": "12345678901",
+        },
+    )
+    assert response.status_code == 201
+
+    outra_paciente = response.json()
+
+    # Tenta atribuir o mesmo CPF à primeira paciente.
+    response = client.patch(
+        f"/api/pacientes/{paciente_a['id']}",
+        headers=headers_a,
+        json={"cpf": outra_paciente["cpf"]},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "CPF já cadastrado."
+
+
+def test_atualizar_paciente_rejeita_dados_invalidos(client):
+    cenario = preparar_cenario(client)
+
+    paciente = cenario["paciente_a"]
+    headers = cenario["headers_a"]
+    url = f"/api/pacientes/{paciente['id']}"
+
+    casos_invalidos = [
+        {"nome": None},
+        {"nome": ""},
+        {"cpf": "123"},
+        {"telefone": "123"},
+        {"clinica_id": 999},
+        {"id": 999},
+        {"created_at": "2026-01-01T00:00:00"},
+    ]
+
+    for dados in casos_invalidos:
+        response = client.patch(
+            url,
+            headers=headers,
+            json=dados,
+        )
+
+        assert response.status_code == 422, (
+            f"Dados {dados} retornaram {response.status_code}: " f"{response.json()}"
+        )
+
+
+def test_atualizar_paciente_permite_limpar_campos_opcionais(client):
+    cenario = preparar_cenario(client)
+
+    paciente = cenario["paciente_a"]
+    headers = cenario["headers_a"]
+
+    response = client.patch(
+        f"/api/pacientes/{paciente['id']}",
+        headers=headers,
+        json={
+            "cpf": None,
+            "telefone": None,
+            "data_nascimento": None,
+        },
+    )
+
+    assert response.status_code == 200
+
+    atualizado = response.json()
+
+    assert atualizado["id"] == paciente["id"]
+    assert atualizado["nome"] == paciente["nome"]
+    assert atualizado["cpf"] is None
+    assert atualizado["telefone"] is None
+    assert atualizado["data_nascimento"] is None
