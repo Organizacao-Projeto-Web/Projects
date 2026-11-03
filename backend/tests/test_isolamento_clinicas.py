@@ -27,6 +27,7 @@ def criar_clinica_com_responsavel(
 
     return response.json()
 
+
 def autenticar(client, email, senha):
     response = client.post(
         "/api/auth/login",
@@ -116,6 +117,7 @@ def preparar_cenario(client):
         "paciente_b": paciente_b,
     }
 
+
 def test_isolamento_de_dados_entre_clinicas(client):
     cenario = preparar_cenario(client)
 
@@ -140,17 +142,13 @@ def test_isolamento_de_dados_entre_clinicas(client):
 
     pacientes_visiveis = response.json()
 
-    ids_visiveis = {
-        paciente["id"]
-        for paciente in pacientes_visiveis
-    }
+    ids_visiveis = {paciente["id"] for paciente in pacientes_visiveis}
 
     assert paciente_a["id"] in ids_visiveis
     assert paciente_b["id"] not in ids_visiveis
 
     assert all(
-        paciente["clinica_id"] == clinica_a["id"]
-        for paciente in pacientes_visiveis
+        paciente["clinica_id"] == clinica_a["id"] for paciente in pacientes_visiveis
     )
 
     # Clínica A não pode consultar prontuário de paciente da Clínica B.
@@ -160,9 +158,7 @@ def test_isolamento_de_dados_entre_clinicas(client):
     )
 
     assert response.status_code == 404
-    assert response.json() == {
-        "detail": "Paciente não encontrado."
-    }
+    assert response.json() == {"detail": "Paciente não encontrado."}
 
     # Clínica A não pode registrar consulta para paciente da Clínica B.
     response = client.post(
@@ -178,9 +174,7 @@ def test_isolamento_de_dados_entre_clinicas(client):
     )
 
     assert response.status_code == 404
-    assert response.json() == {
-        "detail": "Paciente não encontrado."
-    }
+    assert response.json() == {"detail": "Paciente não encontrado."}
 
     # O acesso legítimo da Clínica A deve continuar funcionando.
     response = client.post(
@@ -208,6 +202,7 @@ def test_isolamento_de_dados_entre_clinicas(client):
     )
 
     assert response.status_code == 200
+
 
 def test_endpoints_clinicos_exigem_autenticacao(client):
     response = client.post(
@@ -237,4 +232,40 @@ def test_endpoints_clinicos_exigem_autenticacao(client):
     assert response.status_code == 401
 
     response = client.get("/api/consultas/paciente/1")
+    assert response.status_code == 401
+
+
+def test_buscar_paciente_por_id_respeita_clinica(client):
+    cenario = preparar_cenario(client)
+
+    paciente_a = cenario["paciente_a"]
+    paciente_b = cenario["paciente_b"]
+    headers_a = cenario["headers_a"]
+
+    # Paciente da própria clínica
+    response = client.get(
+        f"/api/pacientes/{paciente_a['id']}",
+        headers=headers_a,
+    )
+    assert response.status_code == 200
+    assert response.json()["id"] == paciente_a["id"]
+
+    # Paciente de outra clínica
+    response = client.get(
+        f"/api/pacientes/{paciente_b['id']}",
+        headers=headers_a,
+    )
+    assert response.status_code == 404
+
+    # Paciente inexistente
+    response = client.get(
+        "/api/pacientes/999999999",
+        headers=headers_a,
+    )
+    assert response.status_code == 404
+
+    # Sem autenticação
+    response = client.get(
+        f"/api/pacientes/{paciente_a['id']}",
+    )
     assert response.status_code == 401

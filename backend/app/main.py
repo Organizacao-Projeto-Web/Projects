@@ -567,6 +567,33 @@ def listar_pacientes(
     )
 
 
+@app.get(
+    "/api/pacientes/{paciente_id}",
+    response_model=PacienteResponse,
+)
+def obter_paciente(
+    paciente_id: int,
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    paciente = (
+        db.query(PacienteModel)
+        .filter(
+            PacienteModel.id == paciente_id,
+            PacienteModel.clinica_id == usuario_atual.clinica_id,
+        )
+        .first()
+    )
+
+    if not paciente:
+        raise HTTPException(
+            status_code=404,
+            detail="Paciente não encontrado.",
+        )
+
+    return paciente
+
+
 # ==================== CONSULTAS E PRONTUÃRIO ====================
 
 
