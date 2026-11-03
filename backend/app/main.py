@@ -617,10 +617,10 @@ def registrar_consulta(
         return nova_consulta
     except IntegrityError:
         db.rollback()
-    raise HTTPException(
-        status_code=400,
-        detail="Não foi possível registrar a consulta.",
-    )
+        raise HTTPException(
+            status_code=400,
+            detail="Não foi possível registrar a consulta.",
+        )
 
     return nova_consulta
 
