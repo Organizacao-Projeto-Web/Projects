@@ -1,5 +1,7 @@
 from typing import List
 import jwt
+import os
+from dotenv import load_dotenv
 from jose import JWTError  # Importado para capturar a exceção do token JWT
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
@@ -64,10 +66,21 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 
+# Origens permitidas para o frontend
+load_dotenv()
+
+CORS_ORIGINS = [
+    origem.strip()
+    for origem in os.getenv(
+        "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",")
+    if origem.strip()
+]
+
 # Permissão de comunicação com o frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
