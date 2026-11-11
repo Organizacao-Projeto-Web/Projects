@@ -5,9 +5,7 @@ import type {
   PatientInput,
   User, UserInput, Registration, Appointment, AppointmentInput, AppointmentStatus,
 } from "./types";
-const base = (
-  import.meta.env.VITE_API_URL || "http://127.0.0.1:3001/api"
-).replace(/\/$/, "");
+const base = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, "");
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -21,8 +19,10 @@ export function clearSession() {
   token = null;
 }
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (!base) throw new ApiError("Configure VITE_API_URL em frontend/.env.local e reinicie o Vite.", 0);
+  const requestToken = token;
   const headers = new Headers(init.headers);
-  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (requestToken) headers.set("Authorization", `Bearer ${requestToken}`);
   if (init.body && !(init.body instanceof URLSearchParams))
     headers.set("Content-Type", "application/json");
   let response: Response;
@@ -40,7 +40,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    if (response.status === 401 && token) {
+    if (response.status === 401 && requestToken && token === requestToken) {
       clearSession();
       window.dispatchEvent(new Event("reab:expired"));
     }

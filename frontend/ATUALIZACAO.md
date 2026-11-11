@@ -22,9 +22,9 @@ As dependências não mudaram. Se estiver instalando em outra máquina ou sem no
 
 ## O que depende do backend
 
-A base recebida está em 8513275 (dev). Ela NÃO inclui GET /api/usuarios/profissionais nem as rotas de agenda. Não foi consultado o estado atual do GitHub nesta atualização.
+A branch origin/dev conferida na revisão do PR #31 está em 8513275. Nessa versão, GET /api/usuarios/profissionais e as rotas de agendamento ainda não estão disponíveis.
 
-Na base atual, cadastrar usuário funciona por POST /api/usuarios. A tela avisa que a listagem está incompleta e mostra a própria conta e os usuários criados nesta sessão; o cadastro real permanece no banco após sair, mas não pode ser recuperado pela interface sem rota de listagem.
+Na dev, administradores podem cadastrar usuários via POST /api/usuarios. A tela informa que a listagem aguarda integração. Quando a rota estiver disponível, a lista do modo conectado virá da API, inclusive após cadastrar um usuário. A agenda fica indisponível no modo conectado até as rotas serem integradas.
 
 A branch de agenda inspecionada fornece:
 - GET /api/usuarios/profissionais (ativos, admin/fisioterapeuta; fisioterapeuta vê somente a si mesmo).
@@ -33,7 +33,7 @@ A branch de agenda inspecionada fornece:
 
 A listagem de profissionais dessa branch NÃO é uma listagem completa de usuários: exclui recepção e inativos. Para gestão completa de equipe, o responsável pelo backend precisa definir uma rota autorizada de usuários. Edição, inativação e exclusão não foram inventadas no frontend.
 
-A integração da branch de agenda e a compatibilidade das migrações/banco devem ser revisadas pelo responsável pelo backend. Este ZIP não contém nem integra essa branch.
+A integração da branch de agenda e a compatibilidade das migrações/banco devem ser revisadas pelo responsável pelo backend. O PR #31 mantém a integração da agenda dependente dessa branch.
 
 Na agenda, “Iniciar atendimento” abre o formulário genérico da paciente correta. Salvar atendimento e marcar agendamento como realizado são operações separadas: não existe vínculo transacional consulta/agendamento no contrato inspecionado. Horários seguem a data/hora local enviada à API.
 

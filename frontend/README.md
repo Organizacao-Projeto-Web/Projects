@@ -39,14 +39,36 @@ Se a porta 5173 estiver ocupada, encerre o servidor anterior. A porta é fixa pa
 
 Os dados demonstrativos são fictícios e ficam apenas na memória. Recarregar a página ou sair encerra a sessão e descarta as alterações. Não use dados reais na demonstração.
 
-## Integração real preparada (a validar com o backend)
+## Executar com o backend da dev no Windows
 
-Ao usar o formulário de login, a aplicação usa a API configurada. Copie .env.example para .env.local e ajuste VITE_API_URL para o endereço real da API, incluindo /api. A porta 3001 é apenas a referência do frontend antigo; não garante em qual porta seu backend está rodando.
+1. Inicie o MySQL ou o banco do XAMPP e crie um banco local separado chamado `reab_db` com `CREATE DATABASE IF NOT EXISTS reab_db CHARACTER SET utf8mb4;`.
+2. No arquivo local `backend/.env`, configure `DB_USER`, `DB_PASS`, `DB_HOST`, `DB_PORT`, `DB_NAME=reab_db` e `SECRET_KEY` com uma chave de desenvolvimento. A API cria as tabelas ao iniciar em um banco novo. Use `CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173` se precisar sobrescrever o padrão.
+3. Em um terminal PowerShell na raiz do projeto, execute:
 
-Reinicie o Vite depois de alterar variáveis. Nunca coloque senhas de banco, chave JWT ou segredos em variáveis VITE_: elas são públicas no navegador.
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
+```
 
-Contratos implementados em src/lib/api.ts:
+4. Confira a API em http://127.0.0.1:8000/docs. Em outro terminal, na raiz do projeto, execute:
 
+```powershell
+cd frontend
+# Se já existir .env.local, edite-o em vez de sobrescrevê-lo.
+Copy-Item .env.example .env.local
+npm ci
+npm run dev
+```
+
+5. Confirme `VITE_API_URL=http://127.0.0.1:8000/api` no `frontend/.env.local` e reinicie o Vite se alterar o arquivo. Abra http://localhost:5173. Use uma conta de teste do banco ou crie uma clínica de teste pelo formulário de cadastro inicial.
+
+Variáveis `VITE_` ficam visíveis no navegador. Mantenha as credenciais e a chave JWT no arquivo local do backend.
+
+Contratos disponíveis na dev usados pelo frontend:
+
+- POST /cadastro, POST /usuarios (administradores) e recuperação de senha por e-mail (requer SMTP).
 - POST /auth/login com username/password em application/x-www-form-urlencoded.
 - GET /usuarios/me.
 - GET/POST /pacientes.
