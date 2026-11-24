@@ -68,9 +68,6 @@ from app.schemas.appointment import (
     AgendamentoStatusUpdate,
 )
 
-# Criar tabelas na inicialização
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(title="Prontuário Eletrônico API", version="1.0.0")
 
 # Proteção contra excesso de requisições
