@@ -32,14 +32,11 @@ from app.core.security import (
 
 # Modelos para criação das tabelas no Banco de Dados
 from app.models.clinic import ClinicaModel
-from app.models.consultation import ConsultaModel
 from app.models.patient import PacienteModel
 from app.models.user import UsuarioModel
-from app.models.password_reset_code import PasswordResetCodeModel
+from app.models.appointment import AgendamentoModel
+from app.models.consultation import ConsultaModel
 
-# Schemas
-from app.schemas.consultation import ConsultaCreate, ConsultaResponse
-from app.schemas.patient import PacienteCreate, PacienteResponse, PacienteUpdate
 from app.schemas.password_reset import (
     MensagemRecuperacaoResponse,
     SolicitarRecuperacaoSenhaRequest,
@@ -47,6 +44,16 @@ from app.schemas.password_reset import (
     VerificarCodigoRecuperacaoRequest,
     RedefinirSenhaRequest,
 )
+from app.models.user import UsuarioModel
+from app.models.password_reset_code import PasswordResetCodeModel
+
+# Schemas
+from app.schemas.consultation import (
+    AcompanhamentoClinicoResponse,
+    ConsultaCreate,
+    ConsultaResponse,
+)
+from app.schemas.patient import PacienteCreate, PacienteResponse, PacienteUpdate
 from app.schemas.user import (
     PrimeiroCadastro,
     PrimeiroCadastroResponse,
@@ -55,9 +62,11 @@ from app.schemas.user import (
     UsuarioCreate,
     UsuarioResponse,
 )
-
-# Criar tabelas na inicialização
-Base.metadata.create_all(bind=engine)
+from app.schemas.appointment import (
+    AgendamentoCreate,
+    AgendamentoResponse,
+    AgendamentoStatusUpdate,
+)
 
 app = FastAPI(title="Prontuário Eletrônico API", version="1.0.0")
 
@@ -684,6 +693,8 @@ def registrar_consulta(
         diagnostico=consulta.diagnostico,
         prescricao=consulta.prescricao,
         observacoes=consulta.observacoes,
+        dor_atual=consulta.dor_atual,
+        percepcao_paciente=consulta.percepcao_paciente,
     )
 
     try:
@@ -737,3 +748,282 @@ def obter_prontuario_paciente(
         .order_by(ConsultaModel.created_at.desc())
         .all()
     )
+
+
+@app.get(
+    "/api/dashboard/acompanhamento-clinico",
+    response_model=List[AcompanhamentoClinicoResponse],
+)
+def obter_acompanhamento_clinico(
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    if usuario_atual.cargo == "recepcao":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A recepção não pode acessar dados clínicos.",
+        )
+
+    registros = (
+        db.query(ConsultaModel, PacienteModel)
+        .join(
+            PacienteModel,
+            ConsultaModel.paciente_id == PacienteModel.id,
+        )
+        .filter(PacienteModel.clinica_id == usuario_atual.clinica_id)
+        .order_by(
+            ConsultaModel.paciente_id.asc(),
+            ConsultaModel.created_at.desc(),
+        )
+        .all()
+    )
+
+    consultas_por_paciente = {}
+
+    for consulta, paciente in registros:
+        if paciente.id not in consultas_por_paciente:
+            consultas_por_paciente[paciente.id] = {
+                "paciente": paciente,
+                "consultas": [],
+            }
+
+        consultas_por_paciente[paciente.id]["consultas"].append(consulta)
+
+    resultado = []
+
+    for item in consultas_por_paciente.values():
+        paciente = item["paciente"]
+        consultas = item["consultas"]
+
+        consulta_atual = consultas[0]
+
+        consulta_anterior = consultas[1] if len(consultas) > 1 else None
+
+        sessoes_sem_melhora = 0
+
+        for consulta in consultas:
+            if consulta.percepcao_paciente in (
+                "igual",
+                "piorou",
+            ):
+                sessoes_sem_melhora += 1
+
+            elif consulta.percepcao_paciente == "melhorou":
+                break
+
+            else:
+                break
+
+        resultado.append(
+            {
+                "paciente_id": paciente.id,
+                "paciente_nome": paciente.nome,
+                "dor_atual": consulta_atual.dor_atual,
+                "dor_anterior": (
+                    consulta_anterior.dor_atual if consulta_anterior else None
+                ),
+                "percepcao_paciente": (consulta_atual.percepcao_paciente),
+                "sessoes_sem_melhora": sessoes_sem_melhora,
+                "ultima_sessao": consulta_atual.created_at,
+            }
+        )
+
+    resultado.sort(
+        key=lambda item: item["ultima_sessao"],
+        reverse=True,
+    )
+
+    return resultado[:5]
+
+
+@app.get(
+    "/api/usuarios/profissionais",
+    response_model=List[UsuarioResponse],
+)
+def listar_profissionais(
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    query = db.query(UsuarioModel).filter(
+        UsuarioModel.clinica_id == usuario_atual.clinica_id,
+        UsuarioModel.ativo.is_(True),
+        UsuarioModel.cargo.in_(["fisioterapeuta", "admin"]),
+    )
+
+    if usuario_atual.cargo == "fisioterapeuta":
+        query = query.filter(UsuarioModel.id == usuario_atual.id)
+
+    return query.order_by(UsuarioModel.nome.asc()).all()
+
+
+# ==================== AGENDAMENTOS ====================
+
+
+@app.post(
+    "/api/agendamentos",
+    response_model=AgendamentoResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def criar_agendamento(
+    agendamento: AgendamentoCreate,
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    paciente = (
+        db.query(PacienteModel)
+        .filter(
+            PacienteModel.id == agendamento.paciente_id,
+            PacienteModel.clinica_id == usuario_atual.clinica_id,
+        )
+        .first()
+    )
+
+    if not paciente:
+        raise HTTPException(
+            status_code=404,
+            detail="Paciente não encontrado.",
+        )
+
+    profissional = (
+        db.query(UsuarioModel)
+        .filter(
+            UsuarioModel.id == agendamento.profissional_id,
+            UsuarioModel.clinica_id == usuario_atual.clinica_id,
+            UsuarioModel.ativo.is_(True),
+        )
+        .first()
+    )
+
+    if not profissional:
+        raise HTTPException(
+            status_code=404,
+            detail="Profissional não encontrado.",
+        )
+
+    if profissional.cargo not in ("fisioterapeuta", "admin"):
+        raise HTTPException(
+            status_code=400,
+            detail="O usuário selecionado não pode receber agendamentos clínicos.",
+        )
+
+    if usuario_atual.cargo == "fisioterapeuta" and profissional.id != usuario_atual.id:
+        raise HTTPException(
+            status_code=403,
+            detail="O fisioterapeuta só pode criar agendamentos para si mesmo.",
+        )
+
+    inicio_novo = agendamento.data_hora
+    # Não aceitar datas com fuso horário no payload
+    if (
+        inicio_novo.tzinfo is not None
+        and inicio_novo.tzinfo.utcoffset(inicio_novo) is not None
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Informe data e hora local, sem fuso horário.",
+        )
+
+    # Horário local da Bahia (UTC-3)
+    agora = datetime.now(timezone(timedelta(hours=-3))).replace(tzinfo=None)
+
+    if inicio_novo < agora:
+        raise HTTPException(
+            status_code=422,
+            detail="Não é permitido criar agendamentos em datas ou horários passados.",
+        )
+
+    fim_novo = inicio_novo + timedelta(minutes=agendamento.duracao_minutos)
+
+    agendamentos_existentes = (
+        db.query(AgendamentoModel)
+        .filter(
+            AgendamentoModel.profissional_id == profissional.id,
+            AgendamentoModel.clinica_id == usuario_atual.clinica_id,
+            AgendamentoModel.status != "cancelado",
+        )
+        .all()
+    )
+
+    for existente in agendamentos_existentes:
+        inicio_existente = existente.data_hora
+        fim_existente = inicio_existente + timedelta(minutes=existente.duracao_minutos)
+
+        if inicio_novo < fim_existente and fim_novo > inicio_existente:
+            raise HTTPException(
+                status_code=409,
+                detail="Já existe um agendamento para este profissional nesse horário.",
+            )
+
+    novo_agendamento = AgendamentoModel(
+        paciente_id=paciente.id,
+        profissional_id=profissional.id,
+        clinica_id=usuario_atual.clinica_id,
+        data_hora=agendamento.data_hora,
+        duracao_minutos=agendamento.duracao_minutos,
+        status="agendado",
+        observacoes=agendamento.observacoes,
+    )
+
+    try:
+        db.add(novo_agendamento)
+        db.commit()
+        db.refresh(novo_agendamento)
+        return novo_agendamento
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Não foi possível criar o agendamento.",
+        )
+
+
+@app.get(
+    "/api/agendamentos",
+    response_model=List[AgendamentoResponse],
+)
+def listar_agendamentos(
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    query = db.query(AgendamentoModel).filter(
+        AgendamentoModel.clinica_id == usuario_atual.clinica_id
+    )
+
+    if usuario_atual.cargo == "fisioterapeuta":
+        query = query.filter(AgendamentoModel.profissional_id == usuario_atual.id)
+
+    return query.order_by(AgendamentoModel.data_hora.asc()).all()
+
+
+@app.patch(
+    "/api/agendamentos/{agendamento_id}/status",
+    response_model=AgendamentoResponse,
+)
+def atualizar_status_agendamento(
+    agendamento_id: int,
+    dados: AgendamentoStatusUpdate,
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    query = db.query(AgendamentoModel).filter(
+        AgendamentoModel.id == agendamento_id,
+        AgendamentoModel.clinica_id == usuario_atual.clinica_id,
+    )
+
+    if usuario_atual.cargo == "fisioterapeuta":
+        query = query.filter(AgendamentoModel.profissional_id == usuario_atual.id)
+
+    agendamento = query.first()
+
+    if not agendamento:
+        raise HTTPException(
+            status_code=404,
+            detail="Agendamento não encontrado.",
+        )
+
+    agendamento.status = dados.status
+
+    db.commit()
+    db.refresh(agendamento)
+
+    return agendamento

@@ -1,4 +1,6 @@
 let todosPacientes = [];
+let pacienteSelecionado = null;
+
 
 async function carregarPacientes() {
   const token = localStorage.getItem("token");
@@ -20,6 +22,7 @@ async function carregarPacientes() {
     }
 
     todosPacientes = await res.json();
+
     renderizarListaPacientes(todosPacientes);
 
   } catch (err) {
@@ -27,51 +30,233 @@ async function carregarPacientes() {
   }
 }
 
+
 function renderizarListaPacientes(pacientes) {
   const lista = document.getElementById("lista-pacientes");
-  lista.innerHTML = "";
+
+  lista.replaceChildren();
 
   if (!pacientes || pacientes.length === 0) {
-    lista.innerHTML = "<li class='py-2 text-xs text-gray-500 text-center'>Nenhum paciente encontrado</li>";
+    const vazio = document.createElement("li");
+
+    vazio.className =
+      "py-4 text-sm text-slate-500 text-center";
+
+    vazio.textContent = "Nenhum paciente encontrado.";
+
+    lista.appendChild(vazio);
     return;
   }
 
-  pacientes.forEach(p => {
+  pacientes.forEach((paciente) => {
     const li = document.createElement("li");
-    li.className = "py-2 cursor-pointer hover:bg-teal-50 px-2 rounded text-sm flex justify-between items-center transition";
-    li.onclick = () => selecionarPaciente(p);
-    const div = document.createElement("div");
 
-    const strong = document.createElement("strong");
-    strong.textContent = p.nome;
+    const selecionado =
+      pacienteSelecionado &&
+      pacienteSelecionado.id === paciente.id;
 
-    const br = document.createElement("br");
+    li.className = [
+      "py-3",
+      "px-3",
+      "rounded-lg",
+      "cursor-pointer",
+      "transition",
+      "border",
+      selecionado
+        ? "bg-teal-50 border-teal-500"
+        : "bg-white border-transparent hover:bg-slate-50 hover:border-slate-200"
+    ].join(" ");
 
-    const span = document.createElement("span");
-    span.className = "text-xs text-gray-500";
-    span.textContent = `CPF: ${p.cpf || "Não informado"}`;
+    li.addEventListener("click", () => {
+      selecionarPaciente(paciente);
+    });
 
-    div.appendChild(strong);
-    div.appendChild(br);
-    div.appendChild(span);
+    const topo = document.createElement("div");
 
-    li.appendChild(div);
+    topo.className =
+      "flex items-start justify-between gap-2";
+
+    const dados = document.createElement("div");
+
+    const nome = document.createElement("p");
+
+    nome.className =
+      "font-semibold text-slate-800";
+
+    nome.textContent = paciente.nome;
+
+    const detalhes = document.createElement("p");
+
+    detalhes.className =
+      "text-xs text-slate-500 mt-1";
+
+    const cpf = paciente.cpf || "Não informado";
+
+    detalhes.textContent =
+      `ID #${paciente.id} • CPF: ${cpf}`;
+
+    dados.appendChild(nome);
+    dados.appendChild(detalhes);
+
+    topo.appendChild(dados);
+
+    if (selecionado) {
+      const badge = document.createElement("span");
+
+      badge.className =
+        "text-xs bg-teal-600 text-white px-2 py-1 rounded-full";
+
+      badge.textContent = "Selecionado";
+
+      topo.appendChild(badge);
+    }
+
+    li.appendChild(topo);
+    lista.appendChild(li);
   });
 }
 
+
+function normalizarTexto(valor) {
+  return String(valor || "")
+    .toLowerCase()
+    .trim();
+}
+
+
+function somenteNumeros(valor) {
+  return String(valor || "").replace(/\D/g, "");
+}
+
+
 function filtrarPacientes() {
-  const termo = document.getElementById("busca-paciente").value.toLowerCase();
-  const filtrados = todosPacientes.filter(p =>
-    p.nome.toLowerCase().includes(termo) || (p.cpf && p.cpf.includes(termo))
-  );
+  const campo = document.getElementById("busca-paciente");
+
+  const termo = normalizarTexto(campo.value);
+  const termoNumerico = somenteNumeros(termo);
+
+  if (!termo) {
+    renderizarListaPacientes(todosPacientes);
+    return;
+  }
+
+  const filtrados = todosPacientes.filter((paciente) => {
+    const id = String(paciente.id);
+    const nome = normalizarTexto(paciente.nome);
+    const cpf = somenteNumeros(paciente.cpf);
+
+    return (
+      id.includes(termo) ||
+      nome.includes(termo) ||
+      (
+        termoNumerico &&
+        cpf.includes(termoNumerico)
+      )
+    );
+  });
+
   renderizarListaPacientes(filtrados);
 }
 
+
 function selecionarPaciente(paciente) {
-  document.getElementById("selected-paciente-id").value = paciente.id;
-  document.getElementById("paciente-selecionado-info").innerText = `Paciente Ativo: ${paciente.nome}`;
+  pacienteSelecionado = paciente;
+
+  document.getElementById(
+    "selected-paciente-id"
+  ).value = paciente.id;
+
+  document.getElementById(
+    "paciente-selecionado-info"
+  ).textContent = `Paciente selecionado: ${paciente.nome}`;
+
+  const painel = document.getElementById(
+    "paciente-selecionado-card"
+  );
+
+  const nome = document.getElementById(
+    "paciente-selecionado-nome"
+  );
+
+  const detalhes = document.getElementById(
+    "paciente-selecionado-detalhes"
+  );
+
+  if (painel && nome && detalhes) {
+    nome.textContent = paciente.nome;
+
+    detalhes.textContent =
+      `ID #${paciente.id} • CPF: ${paciente.cpf || "Não informado"
+      }`;
+
+    painel.classList.remove("hidden");
+  }
+
+  renderizarListaPacientes(
+    filtrarPacientesSelecionados()
+  );
+
   carregarHistorico(paciente.id);
 }
+
+
+function filtrarPacientesSelecionados() {
+  const campo = document.getElementById("busca-paciente");
+
+  const termo = normalizarTexto(campo.value);
+  const termoNumerico = somenteNumeros(termo);
+
+  if (!termo) {
+    return todosPacientes;
+  }
+
+  return todosPacientes.filter((paciente) => {
+    const id = String(paciente.id);
+    const nome = normalizarTexto(paciente.nome);
+    const cpf = somenteNumeros(paciente.cpf);
+
+    return (
+      id.includes(termo) ||
+      nome.includes(termo) ||
+      (
+        termoNumerico &&
+        cpf.includes(termoNumerico)
+      )
+    );
+  });
+}
+
+
+function iniciarAtendimentoPaciente() {
+  if (!pacienteSelecionado) {
+    alert("Selecione um paciente primeiro.");
+    return;
+  }
+
+  mostrarTela("atendimentos");
+
+  const areaAtendimento = document.getElementById(
+    "area-novo-atendimento"
+  );
+
+  if (areaAtendimento) {
+    setTimeout(() => {
+      areaAtendimento.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 100);
+  }
+
+  const campoQueixa = document.getElementById("queixa");
+
+  if (campoQueixa) {
+    setTimeout(() => {
+      campoQueixa.focus();
+    }, 400);
+  }
+}
+
 
 async function cadastrarPaciente(e) {
   e.preventDefault();
@@ -79,10 +264,12 @@ async function cadastrarPaciente(e) {
   const token = localStorage.getItem("token");
 
   const body = {
-    nome: document.getElementById("pac-nome").value,
-    cpf: document.getElementById("pac-cpf").value || null,
-    telefone: document.getElementById("pac-telefone").value || null,
-    data_nascimento: document.getElementById("pac-nascimento").value || null
+    nome: document.getElementById("pac-nome").value.trim(),
+    cpf: document.getElementById("pac-cpf").value.trim() || null,
+    telefone:
+      document.getElementById("pac-telefone").value.trim() || null,
+    data_nascimento:
+      document.getElementById("pac-nascimento").value || null
   };
 
   try {
@@ -111,9 +298,120 @@ async function cadastrarPaciente(e) {
     }
 
     e.target.reset();
+
     await carregarPacientes();
 
   } catch (err) {
     alert(err.message);
   }
 }
+
+function alternarFormularioNovoPaciente() {
+  const formulario = document.getElementById("form-novo-paciente");
+  const botao = document.getElementById("btn-novo-paciente");
+
+  if (!formulario || !botao) return;
+
+  const estaFechado = formulario.classList.contains("hidden");
+
+  formulario.classList.toggle("hidden");
+
+  if (estaFechado) {
+    botao.textContent = "Fechar";
+    document.getElementById("pac-nome")?.focus();
+  } else {
+    botao.textContent = "+ Novo paciente";
+  }
+}
+
+function formatarDataPaciente(data) {
+  if (!data) {
+    return "Não informado";
+  }
+
+  const partes = data.split("-");
+
+  if (partes.length !== 3) {
+    const [ano, mes, dia] = partes;
+    return `${dia}/${mes}/${ano}`;
+  }
+
+  return data;
+}
+
+function abrirPerfilPaciente() {
+  if (!pacienteSelecionado) {
+    alert("Selecione um paciente primeiro.");
+    return;
+  }
+
+  document.getElementById("perfil-paciente-nome").textContent =
+    pacienteSelecionado.nome;
+
+  document.getElementById("perfil-paciente-id").textContent =
+    `#${pacienteSelecionado.id}`;
+
+  document.getElementById("perfil-paciente-cpf").textContent =
+    pacienteSelecionado.cpf || "Não informado";
+
+  document.getElementById("perfil-paciente-telefone").textContent =
+    pacienteSelecionado.telefone || "Não informado";
+
+  document.getElementById("perfil-paciente-nascimento").textContent =
+    formatarDataPaciente(pacienteSelecionado.data_nascimento);
+
+  const perfil = document.getElementById("perfil-paciente-card");
+
+  perfil.classList.remove("hidden");
+
+  perfil.scrollIntoView({
+    behavior: "smooth",
+    block: "nearest"
+  });
+}
+
+function abrirHistoricoPaciente() {
+  if (!pacienteSelecionado) {
+    alert("Selecione um paciente primeiro.");
+    return;
+  }
+
+  carregarHistorico(pacienteSelecionado.id);
+
+  mostrarTela("atendimentos");
+
+  const historico = document.getElementById("area-impressao");
+
+  if (historico) {
+    setTimeout(() => {
+      historico.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 100);
+  }
+}
+
+
+function fecharPerfilPaciente() {
+  const perfil = document.getElementById("perfil-paciente-card");
+
+  if (perfil) {
+    perfil.classList.add("hidden");
+  }
+}
+
+
+document.addEventListener("DOMContentLoaded", () => {
+  document
+    .getElementById("btn-ver-perfil")
+    ?.addEventListener("click", abrirPerfilPaciente);
+
+  document
+    .getElementById("btn-fechar-perfil")
+    ?.addEventListener("click", fecharPerfilPaciente);
+
+  document
+    .getElementById("btn-ver-historico")
+    ?.addEventListener("click", abrirHistoricoPaciente);
+});

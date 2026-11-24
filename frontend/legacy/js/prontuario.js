@@ -9,12 +9,25 @@ async function registrarConsulta(e) {
     return;
   }
 
+  const dorSelecionada =
+    document.querySelector('input[name="dor-atual"]:checked')?.value || null;
+
+  const percepcaoSelecionada =
+    document.querySelector('input[name="percepcao-paciente"]:checked')?.value || null;
+
   const body = {
-    paciente_id: parseInt(pacienteId),
+    paciente_id: parseInt(pacienteId, 10),
     queixa_principal: document.getElementById("queixa").value,
     diagnostico: document.getElementById("diagnostico").value || null,
     prescricao: document.getElementById("prescricao").value || null,
-    observacoes: document.getElementById("observacoes").value || null
+    observacoes: document.getElementById("observacoes").value || null,
+
+    dor_atual:
+      dorSelecionada !== null
+        ? parseInt(dorSelecionada, 10)
+        : null,
+
+    percepcao_paciente: percepcaoSelecionada
   };
 
   try {
@@ -43,6 +56,7 @@ async function registrarConsulta(e) {
     }
 
     e.target.reset();
+
     await carregarHistorico(pacienteId);
 
   } catch (err) {
@@ -81,52 +95,166 @@ async function carregarHistorico(pacienteId) {
       return;
     }
 
-    consultas.forEach(c => {
+    consultas.forEach((c) => {
       const data = new Date(c.created_at).toLocaleDateString("pt-BR");
-      const div = document.createElement("div");
-      div.className = "border-l-4 border-teal-600 bg-gray-50 p-3 rounded text-sm space-y-1 mb-3";
-      const linhaData = document.createElement("div");
-      linhaData.className = "text-xs font-bold text-teal-800";
-      linhaData.textContent = `Sessão em: ${data}`;
 
-      const linhaAnamnese = document.createElement("div");
-      const tituloAnamnese = document.createElement("strong");
-      tituloAnamnese.textContent = "Anamnese: ";
-      linhaAnamnese.appendChild(tituloAnamnese);
-      linhaAnamnese.appendChild(
-        document.createTextNode(c.queixa_principal || "-")
+      const card = document.createElement("div");
+
+      card.className =
+        "border border-slate-200 rounded-xl bg-white overflow-hidden mb-3";
+
+      // =========================
+      // CABEÇALHO DA SESSÃO
+      // =========================
+
+      const cabecalho = document.createElement("button");
+
+      cabecalho.type = "button";
+
+      cabecalho.className =
+        "w-full flex items-center justify-between gap-4 p-4 text-left hover:bg-slate-50 transition";
+
+      const resumo = document.createElement("div");
+
+      const titulo = document.createElement("p");
+
+      titulo.className =
+        "font-semibold text-slate-800";
+
+      titulo.textContent = `Sessão em ${data}`;
+
+      const indicadores = document.createElement("div");
+
+      indicadores.className =
+        "flex flex-wrap gap-2 mt-2";
+
+
+      // DOR
+      const dor = document.createElement("span");
+
+      dor.className =
+        "text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-full";
+
+      if (c.dor_atual !== null && c.dor_atual !== undefined) {
+        dor.textContent = `Dor: ${c.dor_atual}/10`;
+      } else {
+        dor.textContent = "Dor não informada";
+      }
+
+      indicadores.appendChild(dor);
+
+
+      // PERCEPÇÃO
+      if (c.percepcao_paciente) {
+        const percepcao = document.createElement("span");
+
+        percepcao.className =
+          "text-xs bg-teal-50 text-teal-700 px-2 py-1 rounded-full";
+
+        const textosPercepcao = {
+          melhorou: "Melhorou",
+          igual: "Permaneceu igual",
+          piorou: "Piorou"
+        };
+
+        percepcao.textContent =
+          textosPercepcao[c.percepcao_paciente] ||
+          c.percepcao_paciente;
+
+        indicadores.appendChild(percepcao);
+      }
+
+      resumo.appendChild(titulo);
+      resumo.appendChild(indicadores);
+
+
+      const textoExpandir = document.createElement("span");
+
+      textoExpandir.className =
+        "text-sm font-semibold text-teal-700 whitespace-nowrap";
+
+      textoExpandir.textContent = "Ver detalhes";
+
+      cabecalho.appendChild(resumo);
+      cabecalho.appendChild(textoExpandir);
+
+
+      // =========================
+      // DETALHES DA SESSÃO
+      // =========================
+
+      const detalhes = document.createElement("div");
+
+      detalhes.className =
+        "hidden border-t border-slate-100 p-4 bg-slate-50 space-y-3 text-sm";
+
+
+      function adicionarCampo(tituloCampo, valor) {
+        const bloco = document.createElement("div");
+
+        const titulo = document.createElement("p");
+
+        titulo.className =
+          "text-xs font-semibold text-slate-500 uppercase";
+
+        titulo.textContent = tituloCampo;
+
+        const conteudo = document.createElement("p");
+
+        conteudo.className =
+          "text-slate-800 mt-1 whitespace-pre-wrap";
+
+        conteudo.textContent = valor || "Não informado";
+
+        bloco.appendChild(titulo);
+        bloco.appendChild(conteudo);
+
+        detalhes.appendChild(bloco);
+      }
+
+
+      adicionarCampo(
+        "Anamnese / Queixa Principal",
+        c.queixa_principal
       );
 
-      const linhaDiagnostico = document.createElement("div");
-      const tituloDiagnostico = document.createElement("strong");
-      tituloDiagnostico.textContent = "Diagnóstico Cinesiológico: ";
-      linhaDiagnostico.appendChild(tituloDiagnostico);
-      linhaDiagnostico.appendChild(
-        document.createTextNode(c.diagnostico || "-")
+      adicionarCampo(
+        "Diagnóstico Cinesiológico Funcional",
+        c.diagnostico
       );
 
-      const linhaPrescricao = document.createElement("div");
-      const tituloPrescricao = document.createElement("strong");
-      tituloPrescricao.textContent = "Conduta / Exercícios: ";
-      linhaPrescricao.appendChild(tituloPrescricao);
-      linhaPrescricao.appendChild(
-        document.createTextNode(c.prescricao || "-")
+      adicionarCampo(
+        "Conduta / Exercícios Aplicados",
+        c.prescricao
       );
 
-      const linhaObservacoes = document.createElement("div");
-      const tituloObservacoes = document.createElement("strong");
-      tituloObservacoes.textContent = "Evolução: ";
-      linhaObservacoes.appendChild(tituloObservacoes);
-      linhaObservacoes.appendChild(
-        document.createTextNode(c.observacoes || "-")
+      adicionarCampo(
+        "Evolução / Observações",
+        c.observacoes
       );
 
-      div.appendChild(linhaData);
-      div.appendChild(linhaAnamnese);
-      div.appendChild(linhaDiagnostico);
-      div.appendChild(linhaPrescricao);
-      div.appendChild(linhaObservacoes);
-      container.appendChild(div);
+
+      // =========================
+      // ABRIR / FECHAR
+      // =========================
+
+      cabecalho.addEventListener("click", () => {
+        const fechado =
+          detalhes.classList.contains("hidden");
+
+        detalhes.classList.toggle("hidden");
+
+        textoExpandir.textContent =
+          fechado
+            ? "Ocultar detalhes"
+            : "Ver detalhes";
+      });
+
+
+      card.appendChild(cabecalho);
+      card.appendChild(detalhes);
+
+      container.appendChild(card);
     });
 
   } catch (err) {

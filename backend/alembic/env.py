@@ -5,6 +5,7 @@ from sqlalchemy import pool
 
 from app.core.database import Base, DATABASE_URL, engine
 
+from app.models.appointment import AgendamentoModel
 from app.models.clinic import ClinicaModel
 from app.models.consultation import ConsultaModel
 from app.models.patient import PacienteModel

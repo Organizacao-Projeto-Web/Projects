@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -15,6 +15,8 @@ class ConsultaModel(Base):
     diagnostico = Column(Text, nullable=True)
     prescricao = Column(Text, nullable=True)
     observacoes = Column(Text, nullable=True)
+    dor_atual = Column(Integer, nullable=True)
+    percepcao_paciente = Column(String(20), nullable=True)
     created_at = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),

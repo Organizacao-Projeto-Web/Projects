@@ -93,8 +93,8 @@ const initials = (name: string) =>
 const date = (value: string | null) =>
   value
     ? new Intl.DateTimeFormat("pt-BR").format(
-        new Date(value.length === 10 ? `${value}T12:00:00` : value),
-      )
+      new Date(value.length === 10 ? `${value}T12:00:00` : value),
+    )
     : "Não informada";
 function Logo() {
   return (
@@ -323,11 +323,11 @@ function AppContent() {
     const editing = form && form !== "new" ? form : null;
     const saved = demo
       ? {
-          ...data,
-          id: editing?.id ?? Date.now(),
-          clinica_id: 1,
-          created_at: editing?.created_at ?? new Date().toISOString(),
-        }
+        ...data,
+        id: editing?.id ?? Date.now(),
+        clinica_id: 1,
+        created_at: editing?.created_at ?? new Date().toISOString(),
+      }
       : editing
         ? await api.updatePatient(editing.id, data)
         : await api.createPatient(data);
@@ -500,7 +500,7 @@ function AppContent() {
                 />
               }
             />
-            <Route path="/profissionais" element={<Professionals user={user} demo={demo} added={addedUsers} onAdd={u => setAddedUsers(prev => [...prev,u])} />} />
+            <Route path="/profissionais" element={<Professionals user={user} demo={demo} added={addedUsers} onAdd={u => setAddedUsers(prev => [...prev, u])} />} />
             <Route path="/agenda" element={<Agenda user={user} demo={demo} patients={patients} appointments={appointments} onAppointments={setAppointments} />} />
             <Route path="/relatorios" element={<Reports patients={patients} loading={loading} error={loadError} demo={demo} />} />
             <Route path="/configuracoes" element={<SettingsPage user={user} demo={demo} />} />
@@ -854,12 +854,21 @@ function PatientDetail({
   const [error, setError] = useState("");
   const [add, setAdd] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [agendamentoId, setAgendamentoId] = useState<number | null>(null);
   const [saveError, setSaveError] = useState("");
   const canRead = user.cargo !== "recepcao";
   useEffect(() => {
     if (patient && canRead && searchParams.get("novo") === "1") {
+      const id = searchParams.get("agendamento");
+
+      setAgendamentoId(
+        id && /^\d+$/.test(id) && Number(id) > 0
+          ? Number(id)
+          : null
+      );
+
       setAdd(true);
-      setSearchParams({}, {replace: true});
+      setSearchParams({}, { replace: true });
     }
   }, [patient?.id, canRead, searchParams, setSearchParams]);
   useEffect(() => {
@@ -907,15 +916,35 @@ function PatientDetail({
     try {
       const result = demo
         ? {
-            ...input,
-            id: Date.now(),
-            medico_id: user.id,
-            created_at: new Date().toISOString(),
-          }
+          ...input,
+          id: Date.now(),
+          medico_id: user.id,
+          created_at: new Date().toISOString(),
+        }
         : await api.createConsultation(input);
-      if (demo) onConsultation(result);
-      else setHistory((prev) => [result, ...prev]);
+      if (demo) {
+        onConsultation(result);
+      } else {
+        setHistory((prev) => [result, ...prev]);
+      }
+
       setAdd(false);
+
+      if (!demo && agendamentoId !== null) {
+        try {
+          await api.appointmentStatus(agendamentoId, "realizado");
+        } catch (err) {
+          setError(
+            "O atendimento foi salvo, mas não foi possível concluir o agendamento: " +
+            (err as Error).message +
+            ". Atualize o status na Agenda sem cadastrar outra consulta."
+          );
+          return;
+        }
+
+        setAgendamentoId(null);
+        navigate("/agenda");
+      }
     } catch (err) {
       setSaveError((err as Error).message);
     } finally {
