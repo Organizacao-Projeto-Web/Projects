@@ -9,6 +9,7 @@ def test_primeiro_cadastro_cria_clinica_e_responsavel(client):
             "responsavel": {
                 "nome": "Fisioterapeuta Responsável",
                 "email": "responsavel@example.com",
+                "whatsapp": "5575999999999",
                 "senha": "SenhaTeste123!",
                 "crefito": "12345-F",
             },
@@ -43,6 +44,7 @@ def test_usuario_inativo_nao_pode_fazer_login(client, app_context):
             "responsavel": {
                 "nome": "Fisioterapeuta Inativo",
                 "email": "inativo@example.com",
+                "whatsapp": "5575999999999",
                 "senha": "SenhaTeste123!",
                 "crefito": "54321-F",
             },
@@ -93,6 +95,7 @@ def test_nao_permite_criar_usuario_sem_autenticacao(client):
             "responsavel": {
                 "nome": "Responsável Clínica Protegida",
                 "email": "responsavel.protegida@example.com",
+                "whatsapp": "5575999999999",
                 "senha": "SenhaTeste123!",
                 "crefito": "11111-F",
             },
@@ -108,6 +111,7 @@ def test_nao_permite_criar_usuario_sem_autenticacao(client):
         json={
             "nome": "Usuário Indevido",
             "email": "indevido@example.com",
+            "whatsapp": "5575999999999",
             "senha": "SenhaTeste123!",
             "crefito": "99999-F",
             "cargo": "fisioterapeuta",
@@ -128,6 +132,7 @@ def test_usuario_nao_pode_criar_usuario_em_outra_clinica(client):
             "responsavel": {
                 "nome": "Responsável A",
                 "email": "responsavel.a@example.com",
+                "whatsapp": "5575999999999",
                 "senha": "SenhaTeste123!",
                 "crefito": "11111-F",
             },
@@ -144,6 +149,7 @@ def test_usuario_nao_pode_criar_usuario_em_outra_clinica(client):
             "responsavel": {
                 "nome": "Responsável B",
                 "email": "responsavel.b@example.com",
+                "whatsapp": "5575999999999",
                 "senha": "SenhaTeste123!",
                 "crefito": "22222-F",
             },
@@ -176,6 +182,7 @@ def test_usuario_nao_pode_criar_usuario_em_outra_clinica(client):
         json={
             "nome": "Novo Fisioterapeuta",
             "email": "novo.fisio@example.com",
+            "whatsapp": "5575999999999",
             "senha": "SenhaTeste123!",
             "crefito": "33333-F",
             "cargo": "fisioterapeuta",
@@ -204,6 +211,7 @@ def test_usuario_inativo_com_token_existente_nao_pode_acessar_sistema(
             "responsavel": {
                 "nome": "Fisioterapeuta Token Revogado",
                 "email": "token.revogado@example.com",
+                "whatsapp": "5575999999999",
                 "senha": "SenhaTeste123!",
                 "crefito": "22222-F",
             },
@@ -287,6 +295,7 @@ def test_fisioterapeuta_nao_pode_criar_outro_usuario(client):
             "responsavel": {
                 "nome": "Administrador",
                 "email": "admin.permissoes@example.com",
+                "whatsapp": "5575999999999",
                 "senha": "SenhaTeste123!",
                 "crefito": "33333-F",
             },
@@ -312,6 +321,7 @@ def test_fisioterapeuta_nao_pode_criar_outro_usuario(client):
         json={
             "nome": "Fisioterapeuta Comum",
             "email": "fisio.comum@example.com",
+            "whatsapp": "5575999999999",
             "senha": "SenhaTeste123!",
             "crefito": "44444-F",
             "cargo": "fisioterapeuta",
@@ -337,6 +347,7 @@ def test_fisioterapeuta_nao_pode_criar_outro_usuario(client):
         json={
             "nome": "Usuário Indevido",
             "email": "usuario.indevido@example.com",
+            "whatsapp": "5575999999999",
             "senha": "SenhaTeste123!",
             "crefito": "55555-F",
             "cargo": "fisioterapeuta",
@@ -359,6 +370,7 @@ def test_recepcao_nao_pode_acessar_prontuario_nem_registrar_consulta(client):
             "responsavel": {
                 "nome": "Administrador Recepção",
                 "email": "admin.recepcao@example.com",
+                "whatsapp": "5575999999999",
                 "senha": "SenhaTeste123!",
                 "crefito": "66666-F",
             },
@@ -389,6 +401,7 @@ def test_recepcao_nao_pode_acessar_prontuario_nem_registrar_consulta(client):
         json={
             "nome": "Recepcionista",
             "email": "recepcao@example.com",
+            "whatsapp": "5575999999999",
             "senha": "SenhaTeste123!",
             "crefito": "REC-001",
             "cargo": "recepcao",

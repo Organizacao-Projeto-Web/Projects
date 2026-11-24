@@ -21,3 +21,6 @@ __pycache__/
 .vscode/
 .idea/
 .DS_Store
+# Ambiente local e backup
+.venv/
+/frontend_backup/

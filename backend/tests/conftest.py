@@ -74,6 +74,7 @@ def app_context(test_engine):
     from app.models.clinic import ClinicaModel  # noqa: F401
     from app.models.consultation import ConsultaModel  # noqa: F401
     from app.models.patient import PacienteModel  # noqa: F401
+    from app.models.password_reset_code import PasswordResetCodeModel  # noqa: F401
     from app.models.user import UsuarioModel  # noqa: F401
 
     from app.main import app

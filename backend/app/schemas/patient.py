@@ -29,3 +29,24 @@ class PacienteResponse(PacienteBase):
     id: int
     clinica_id: int
     created_at: datetime
+
+
+class PacienteUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nome: Optional[str] = Field(
+        default=None,
+        min_length=2,
+        max_length=150,
+    )
+    cpf: Optional[str] = Field(
+        default=None,
+        pattern=r"^\d{11}$",
+    )
+    data_nascimento: Optional[date] = None
+    telefone: Optional[str] = Field(
+        default=None,
+        min_length=10,
+        max_length=15,
+        pattern=r"^\d+$",
+    )

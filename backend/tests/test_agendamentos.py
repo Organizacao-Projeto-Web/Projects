@@ -1,4 +1,4 @@
-def criar_clinica_admin(
+﻿def criar_clinica_admin(
     client,
     nome_clinica,
     cnpj,
@@ -17,6 +17,7 @@ def criar_clinica_admin(
                 "nome": nome_admin,
                 "email": email_admin,
                 "senha": "SenhaTeste123!",
+                "whatsapp": "75999990000",
                 "crefito": crefito,
             },
         },
@@ -56,6 +57,7 @@ def criar_usuario(
             "nome": nome,
             "email": email,
             "senha": "SenhaTeste123!",
+            "whatsapp": "75999990000",
             "crefito": crefito,
             "cargo": cargo,
         },
@@ -89,7 +91,7 @@ def criar_paciente(
 def test_admin_pode_criar_agendamento(client):
     cadastro = criar_clinica_admin(
         client,
-        nome_clinica="Clínica Agenda",
+        nome_clinica="ClÃ­nica Agenda",
         cnpj="11111111000111",
         nome_admin="Administrador Agenda",
         email_admin="admin.agenda@example.com",
@@ -116,9 +118,9 @@ def test_admin_pode_criar_agendamento(client):
         json={
             "paciente_id": paciente["id"],
             "profissional_id": admin_id,
-            "data_hora": "2026-10-20T10:00:00",
+            "data_hora": "2027-10-20T10:00:00",
             "duracao_minutos": 60,
-            "observacoes": "Primeira avaliação",
+            "observacoes": "Primeira avaliaÃ§Ã£o",
         },
     )
 
@@ -136,7 +138,7 @@ def test_admin_pode_criar_agendamento(client):
 def test_nao_permite_conflito_de_horario(client):
     cadastro = criar_clinica_admin(
         client,
-        nome_clinica="Clínica Conflito",
+        nome_clinica="ClÃ­nica Conflito",
         cnpj="22222222000122",
         nome_admin="Administrador Conflito",
         email_admin="admin.conflito@example.com",
@@ -163,7 +165,7 @@ def test_nao_permite_conflito_de_horario(client):
         json={
             "paciente_id": paciente["id"],
             "profissional_id": admin_id,
-            "data_hora": "2026-10-20T10:00:00",
+            "data_hora": "2027-10-20T10:00:00",
             "duracao_minutos": 60,
         },
     )
@@ -176,21 +178,21 @@ def test_nao_permite_conflito_de_horario(client):
         json={
             "paciente_id": paciente["id"],
             "profissional_id": admin_id,
-            "data_hora": "2026-10-20T10:30:00",
+            "data_hora": "2027-10-20T10:30:00",
             "duracao_minutos": 60,
         },
     )
 
     assert conflito.status_code == 409
     assert conflito.json() == {
-        "detail": ("Já existe um agendamento para este profissional " "nesse horário.")
+        "detail": "Já existe um agendamento para este profissional nesse horário."
     }
 
 
 def test_agendamento_respeita_isolamento_entre_clinicas(client):
     cadastro_a = criar_clinica_admin(
         client,
-        nome_clinica="Clínica Agenda A",
+        nome_clinica="ClÃ­nica Agenda A",
         cnpj="33333333000133",
         nome_admin="Administrador A",
         email_admin="admin.a.agenda@example.com",
@@ -199,7 +201,7 @@ def test_agendamento_respeita_isolamento_entre_clinicas(client):
 
     cadastro_b = criar_clinica_admin(
         client,
-        nome_clinica="Clínica Agenda B",
+        nome_clinica="ClÃ­nica Agenda B",
         cnpj="44444444000144",
         nome_admin="Administrador B",
         email_admin="admin.b.agenda@example.com",
@@ -219,7 +221,7 @@ def test_agendamento_respeita_isolamento_entre_clinicas(client):
     paciente_b = criar_paciente(
         client,
         headers_b,
-        nome="Paciente Clínica B",
+        nome="Paciente ClÃ­nica B",
         cpf="33333333333",
     )
 
@@ -229,7 +231,7 @@ def test_agendamento_respeita_isolamento_entre_clinicas(client):
         json={
             "paciente_id": paciente_b["id"],
             "profissional_id": cadastro_a["responsavel"]["id"],
-            "data_hora": "2026-10-21T09:00:00",
+            "data_hora": "2027-10-21T09:00:00",
             "duracao_minutos": 60,
         },
     )
@@ -244,11 +246,11 @@ def test_agendamento_respeita_isolamento_entre_clinicas(client):
             "paciente_id": criar_paciente(
                 client,
                 headers_a,
-                nome="Paciente Clínica A",
+                nome="Paciente ClÃ­nica A",
                 cpf="44444444444",
             )["id"],
             "profissional_id": cadastro_b["responsavel"]["id"],
-            "data_hora": "2026-10-21T11:00:00",
+            "data_hora": "2027-10-21T11:00:00",
             "duracao_minutos": 60,
         },
     )
@@ -260,9 +262,9 @@ def test_agendamento_respeita_isolamento_entre_clinicas(client):
 def test_recepcao_pode_criar_agendamento(client):
     cadastro = criar_clinica_admin(
         client,
-        nome_clinica="Clínica Recepção Agenda",
+        nome_clinica="ClÃ­nica RecepÃ§Ã£o Agenda",
         cnpj="55555555000155",
-        nome_admin="Administrador Recepção",
+        nome_admin="Administrador RecepÃ§Ã£o",
         email_admin="admin.recepcao.agenda@example.com",
         crefito="55555-F",
     )
@@ -284,7 +286,7 @@ def test_recepcao_pode_criar_agendamento(client):
     paciente = criar_paciente(
         client,
         headers_admin,
-        nome="Paciente Recepção",
+        nome="Paciente RecepÃ§Ã£o",
         cpf="55555555555",
     )
 
@@ -299,7 +301,7 @@ def test_recepcao_pode_criar_agendamento(client):
         json={
             "paciente_id": paciente["id"],
             "profissional_id": cadastro["responsavel"]["id"],
-            "data_hora": "2026-10-22T14:00:00",
+            "data_hora": "2027-10-22T14:00:00",
             "duracao_minutos": 60,
         },
     )
@@ -310,7 +312,7 @@ def test_recepcao_pode_criar_agendamento(client):
 def test_fisioterapeuta_so_pode_agendar_para_si_mesmo(client):
     criar_clinica_admin(
         client,
-        nome_clinica="Clínica Fisioterapeutas",
+        nome_clinica="ClÃ­nica Fisioterapeutas",
         cnpj="66666666000166",
         nome_admin="Administrador Fisioterapeutas",
         email_admin="admin.fisios@example.com",
@@ -358,7 +360,7 @@ def test_fisioterapeuta_so_pode_agendar_para_si_mesmo(client):
         json={
             "paciente_id": paciente["id"],
             "profissional_id": fisio_a["id"],
-            "data_hora": "2026-10-23T08:00:00",
+            "data_hora": "2027-10-23T08:00:00",
             "duracao_minutos": 60,
         },
     )
@@ -371,14 +373,14 @@ def test_fisioterapeuta_so_pode_agendar_para_si_mesmo(client):
         json={
             "paciente_id": paciente["id"],
             "profissional_id": fisio_b["id"],
-            "data_hora": "2026-10-23T10:00:00",
+            "data_hora": "2027-10-23T10:00:00",
             "duracao_minutos": 60,
         },
     )
 
     assert outro.status_code == 403
     assert outro.json() == {
-        "detail": ("O fisioterapeuta só pode criar agendamentos " "para si mesmo.")
+        "detail": ("O fisioterapeuta só pode criar agendamentos para si mesmo.")
     }
 
     lista = client.get(
@@ -397,7 +399,7 @@ def test_fisioterapeuta_so_pode_agendar_para_si_mesmo(client):
 def test_cancelamento_libera_horario(client):
     cadastro = criar_clinica_admin(
         client,
-        nome_clinica="Clínica Cancelamento",
+        nome_clinica="ClÃ­nica Cancelamento",
         cnpj="77777777000177",
         nome_admin="Administrador Cancelamento",
         email_admin="admin.cancelamento@example.com",
@@ -424,7 +426,7 @@ def test_cancelamento_libera_horario(client):
         json={
             "paciente_id": paciente["id"],
             "profissional_id": admin_id,
-            "data_hora": "2026-10-24T15:00:00",
+            "data_hora": "2027-10-24T15:00:00",
             "duracao_minutos": 60,
         },
     )
@@ -450,7 +452,7 @@ def test_cancelamento_libera_horario(client):
         json={
             "paciente_id": paciente["id"],
             "profissional_id": admin_id,
-            "data_hora": "2026-10-24T15:00:00",
+            "data_hora": "2027-10-24T15:00:00",
             "duracao_minutos": 60,
         },
     )
@@ -461,7 +463,7 @@ def test_cancelamento_libera_horario(client):
 def test_lista_profissionais_respeita_clinica_e_permissoes(client):
     criar_clinica_admin(
         client,
-        nome_clinica="Clínica Profissionais A",
+        nome_clinica="ClÃ­nica Profissionais A",
         cnpj="88888888000188",
         nome_admin="Administrador Profissionais A",
         email_admin="admin.profissionais.a@example.com",
@@ -470,7 +472,7 @@ def test_lista_profissionais_respeita_clinica_e_permissoes(client):
 
     criar_clinica_admin(
         client,
-        nome_clinica="Clínica Profissionais B",
+        nome_clinica="ClÃ­nica Profissionais B",
         cnpj="99999999000199",
         nome_admin="Administrador Profissionais B",
         email_admin="admin.profissionais.b@example.com",
