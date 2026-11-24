@@ -29,6 +29,8 @@ export interface Consultation {
   diagnostico: string | null;
   prescricao: string | null;
   observacoes: string | null;
+  dor_atual: number | null;
+  percepcao_paciente: "melhorou" | "igual" | "piorou" | null;
   created_at: string;
 }
 export type ConsultationInput = Omit<
@@ -51,4 +53,14 @@ export interface AppointmentInput {
 }
 export interface Appointment extends AppointmentInput {
   id: number; clinica_id: number; status: AppointmentStatus; created_at: string;
+}
+
+// Formato consumido pelo dashboard legado quando a rota está disponível.
+export interface ClinicalFollowUp {
+  paciente_id?: number;
+  paciente_nome: string;
+  percepcao_paciente: "melhorou" | "igual" | "piorou" | null;
+  dor_anterior: number | null;
+  dor_atual: number | null;
+  sessoes_sem_melhora: number;
 }

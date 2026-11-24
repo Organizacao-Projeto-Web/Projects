@@ -1482,3 +1482,42 @@ select, .table-toolbar input[type=date], .report-filters input {font: inherit; c
 .settings-card dd {margin: 4px 0 0; overflow-wrap: anywhere;}
 .account-links {display: flex; flex-wrap: wrap; justify-content: center; gap: 18px;}
 @media(max-width: 760px) {.settings-grid,.summary-grid {grid-template-columns: 1fr;} .appointment-card {flex-wrap: wrap; gap: 16px;} .appointment-time {min-width: 125px;} .appointment-actions {width: 100%; flex-direction: row; align-items: center; flex-wrap: wrap;} .page-heading {flex-wrap: wrap; gap: 16px;}}
+
+/* Indicadores do prontuário e ações do histórico */
+.history-actions {display: flex; gap: 10px; flex-wrap: wrap;}
+.consultation-clinical {display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0;}
+.consultation-clinical span {padding: 6px 10px; border-radius: 8px; background: #eff4ff; color: #45618d; font-size: 11px;}
+
+/* Impressão apenas do prontuário da paciente aberta */
+@media print {
+  @page {size: A4; margin: 16mm;}
+  :root, body, #root, .app-shell, .main-shell, .content {background: white !important; color: #171c26 !important;}
+  .sidebar, .sidebar-shade, .topbar, .mode-banner, .page-footer, .toast-region,
+  .patient-detail .back-link, .patient-detail .page-heading > button,
+  .patient-detail .history-actions, .patient-detail > .section-heading,
+  .patient-detail > .module-grid {display: none !important;}
+  .main-shell {margin: 0 !important;}
+  .content {padding: 0 !important; margin: 0 !important; max-width: none !important;}
+  .patient-detail .page-heading {margin-bottom: 16px;}
+  .patient-detail .patient-facts {grid-template-columns: repeat(4, 1fr); break-inside: avoid;}
+  .patient-detail .panel {border: 0; border-radius: 0; box-shadow: none; padding: 0;}
+  .patient-detail .history-panel .section-heading {display: block;}
+  .patient-detail .history-panel .section-heading p {display: none;}
+  .patient-detail .consultation {break-inside: avoid; page-break-inside: avoid;}
+  .patient-detail .consultation-clinical span {border: 1px solid #cbd5e1; background: #fff; color: #171c26;}
+}
+
+/* Resumo da agenda e acompanhamento no dashboard */
+.metrics.dashboard-metrics {grid-template-columns: repeat(4, minmax(0, 1fr));}
+.dashboard-live-grid {margin-top: 22px;}
+.dashboard-today-row, .dashboard-followup-row {padding: 14px 0; border-top: 1px solid #edf0f5;}
+.dashboard-today-row {display: flex; align-items: center; gap: 16px;}
+.dashboard-today-time {color: #4667a3; min-width: 44px; font-size: 13px;}
+.dashboard-today-row > div {flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px;}
+.dashboard-today-row > div strong, .dashboard-followup-head strong {font-size: 12px; overflow-wrap: anywhere;}
+.dashboard-today-row small, .dashboard-followup-row p {font-size: 11px; color: #77869a;}
+.dashboard-followup-head {display: flex; justify-content: space-between; align-items: center; gap: 8px;}
+.dashboard-followup-row p {margin-top: 7px; line-height: 1.6;}
+.dashboard-followup-alert {font-weight: 600; color: #986d28;}
+@media(max-width: 1200px) {.metrics.dashboard-metrics {grid-template-columns: repeat(2, minmax(0, 1fr));}}
+@media(max-width: 600px) {.metrics.dashboard-metrics {grid-template-columns: 1fr;} .dashboard-today-row {gap: 8px;} .dashboard-today-row .status-pill {font-size: 10px;}}

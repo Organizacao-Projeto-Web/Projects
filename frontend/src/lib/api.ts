@@ -3,7 +3,7 @@ import type {
   ConsultationInput,
   Patient,
   PatientInput,
-  User, UserInput, Registration, Appointment, AppointmentInput, AppointmentStatus,
+  User, UserInput, Registration, Appointment, AppointmentInput, AppointmentStatus, ClinicalFollowUp,
 } from "./types";
 const base = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, "");
 export class ApiError extends Error {
@@ -68,6 +68,7 @@ export const api = {
   verifyReset: (email: string, codigo: string) => request<{reset_token: string}>("/auth/recuperacao-senha/verificar", {method: "POST", body: JSON.stringify({email, codigo})}),
   resetPassword: (reset_token: string, nova_senha: string) => request("/auth/recuperacao-senha/redefinir", {method: "POST", body: JSON.stringify({reset_token, nova_senha})}),
   appointments: () => request<Appointment[]>("/agendamentos"),
+  clinicalFollowUp: () => request<ClinicalFollowUp[]>("/dashboard/acompanhamento-clinico"),
   createAppointment: (data: AppointmentInput) => request<Appointment>("/agendamentos", {method: "POST", body: JSON.stringify(data)}),
   appointmentStatus: (id: number, status: AppointmentStatus) => request<Appointment>(`/agendamentos/${id}/status`, {method: "PATCH", body: JSON.stringify({status})}),
   async login(email: string, password: string) {

@@ -26,6 +26,7 @@ import {
   LogOut,
   Menu,
   Plus,
+  Printer,
   Search,
   Settings,
   ShieldCheck,
@@ -38,9 +39,9 @@ import type {
   ConsultationInput,
   Patient,
   PatientInput,
-  User, Appointment,
+  User, Appointment, ClinicalFollowUp,
 } from "./lib/types";
-import { api, clearSession } from "./lib/api";
+import { api, ApiError, clearSession } from "./lib/api";
 import { demoPatients, demoUser } from "./lib/demo";
 import { PatientForm } from "./components/PatientForm";
 import { Modal } from "./components/Modal";
@@ -469,6 +470,7 @@ function AppContent() {
                   patients={patients}
                   loading={loading}
                   demo={demo}
+                  appointments={appointments}
                   user={user}
                   onNew={() => setForm("new")}
                 />
@@ -534,16 +536,79 @@ function Dashboard({
   patients,
   loading,
   demo,
+  appointments,
   user,
   onNew,
 }: {
   patients: Patient[];
   loading: boolean;
   demo: boolean;
+  appointments: Appointment[];
   user: User;
   onNew: () => void;
 }) {
   const navigate = useNavigate();
+  const [agenda, setAgenda] = useState<Appointment[]>([]);
+  const [agendaLoading, setAgendaLoading] = useState(!demo);
+  const [agendaError, setAgendaError] = useState("");
+  const [followUp, setFollowUp] = useState<ClinicalFollowUp[]>([]);
+  const [followUpStatus, setFollowUpStatus] = useState<
+    "loading" | "ready" | "restricted" | "missing" | "error" | "demo"
+  >(demo ? "demo" : "loading");
+
+  // Recarrega ao entrar no dashboard; a Agenda pode ter alterado os horários.
+  useEffect(() => {
+    if (demo) return;
+    let active = true;
+    setAgendaLoading(true);
+    setAgendaError("");
+    api.appointments()
+      .then((rows) => { if (active) setAgenda(rows); })
+      .catch((error: unknown) => {
+        if (active) setAgendaError(
+          error instanceof ApiError && error.status === 404
+            ? "A agenda não está disponível neste backend."
+            : (error as Error).message,
+        );
+      })
+      .finally(() => { if (active) setAgendaLoading(false); });
+    return () => { active = false; };
+  }, [demo, user.id]);
+
+  useEffect(() => {
+    if (demo) { setFollowUpStatus("demo"); return; }
+    if (user.cargo === "recepcao") { setFollowUpStatus("restricted"); return; }
+    let active = true;
+    setFollowUpStatus("loading");
+    api.clinicalFollowUp()
+      .then((rows) => {
+        if (active) {
+          setFollowUp(Array.isArray(rows) ? rows : []);
+          setFollowUpStatus("ready");
+        }
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (error instanceof ApiError && error.status === 403)
+          setFollowUpStatus("restricted");
+        else if (error instanceof ApiError && error.status === 404)
+          setFollowUpStatus("missing");
+        else setFollowUpStatus("error");
+      });
+    return () => { active = false; };
+  }, [demo, user.id, user.cargo]);
+
+  const allAppointments = demo ? appointments : agenda;
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const appointmentsToday = allAppointments
+    .filter((a) => a.data_hora.slice(0, 10) === todayKey && a.status !== "cancelado")
+    .sort((a, b) => a.data_hora.localeCompare(b.data_hora));
+  const upcoming = allAppointments.filter(
+    (a) => a.status === "agendado" && new Date(a.data_hora).getTime() >= today.getTime(),
+  ).length;
+  const completed = allAppointments.filter((a) => a.status === "realizado").length;
+
   return (
     <>
       <div className="page-heading">
@@ -602,11 +667,9 @@ function Dashboard({
           <span className="art-spark">✧</span>
         </div>
       </section>
-      <section className="metrics" aria-label="Resumo">
+      <section className="metrics dashboard-metrics" aria-label="Resumo da clínica">
         <div className="metric">
-          <span className="metric-icon blue">
-            <Users size={21} />
-          </span>
+          <span className="metric-icon blue"><Users size={21} /></span>
           <div>
             <span>Pacientes cadastradas</span>
             <strong>{loading ? "…" : patients.length}</strong>
@@ -614,28 +677,27 @@ function Dashboard({
           </div>
         </div>
         <div className="metric">
-          <span className="metric-icon green">
-            <CalendarDays size={21} />
-          </span>
+          <span className="metric-icon green"><CalendarDays size={21} /></span>
           <div>
-            <span>Agenda</span>
-            <button className="metric-action" onClick={() => navigate("/agenda")}>Ver horários <ArrowRight size={16} /></button>
-            <small>Consulte e organize os atendimentos</small>
+            <span>Atendimentos de hoje</span>
+            <strong>{agendaLoading && !demo ? "…" : agendaError ? "—" : appointmentsToday.length}</strong>
+            <small>Agendados ou realizados</small>
           </div>
         </div>
         <div className="metric">
-          <span className="metric-icon purple">
-            <FileText size={21} />
-          </span>
+          <span className="metric-icon purple"><Clock3 size={21} /></span>
           <div>
-            <span>Histórico de atendimentos</span>
-            <button
-              className="metric-action"
-              onClick={() => navigate("/pacientes")}
-            >
-              Por paciente <ArrowRight size={16} />
-            </button>
-            <small>Acesse pelo perfil da paciente</small>
+            <span>Próximos agendamentos</span>
+            <strong>{agendaLoading && !demo ? "…" : agendaError ? "—" : upcoming}</strong>
+            <small>Pendentes, a partir de agora</small>
+          </div>
+        </div>
+        <div className="metric">
+          <span className="metric-icon pink"><FileText size={21} /></span>
+          <div>
+            <span>Agendamentos realizados</span>
+            <strong>{agendaLoading && !demo ? "…" : agendaError ? "—" : completed}</strong>
+            <small>Total disponível na agenda</small>
           </div>
         </div>
       </section>
@@ -702,6 +764,89 @@ function Dashboard({
           <div className="quiet-note">
             <ShieldCheck size={15} /> Acesso conforme o perfil profissional
           </div>
+        </section>
+      </div>
+      <div className="dashboard-grid dashboard-live-grid">
+        <section className="panel">
+          <div className="section-heading">
+            <div>
+              <h2>Agenda de hoje</h2>
+              <p>Atendimentos da agenda acessíveis ao seu perfil.</p>
+            </div>
+            <button className="text-button" onClick={() => navigate("/agenda")}>
+              Abrir agenda <ArrowRight size={15} />
+            </button>
+          </div>
+          {!demo && agendaLoading ? (
+            <p className="empty" role="status">Carregando agenda…</p>
+          ) : agendaError ? (
+            <p className="empty" role="alert">{agendaError}</p>
+          ) : appointmentsToday.length === 0 ? (
+            <p className="empty">Nenhum atendimento para hoje.</p>
+          ) : (
+            <div className="dashboard-today-list">
+              {appointmentsToday.map((a) => (
+                <div className="dashboard-today-row" key={a.id}>
+                  <strong className="dashboard-today-time">{a.data_hora.slice(11, 16)}</strong>
+                  <div>
+                    <strong>{patients.find((p) => p.id === a.paciente_id)?.nome || `Paciente #${a.paciente_id}`}</strong>
+                    <small>{a.duracao_minutos} minutos</small>
+                  </div>
+                  <span className={`status-pill ${a.status}`}>
+                    {a.status === "realizado" ? "Realizado" : "Agendado"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+        <section className="panel">
+          <div className="section-heading">
+            <div>
+              <h2>Acompanhamento clínico</h2>
+              <p>Evolução registrada nos atendimentos.</p>
+            </div>
+          </div>
+          {followUpStatus === "loading" ? (
+            <p className="empty" role="status">Carregando acompanhamento…</p>
+          ) : followUpStatus === "restricted" ? (
+            <p className="empty">Acompanhamento clínico restrito para este perfil.</p>
+          ) : followUpStatus === "missing" ? (
+            <p className="empty">A rota de acompanhamento clínico não está disponível neste backend.</p>
+          ) : followUpStatus === "error" ? (
+            <p className="empty" role="alert">Não foi possível carregar o acompanhamento clínico.</p>
+          ) : followUpStatus === "demo" ? (
+            <p className="empty">Acompanhamento clínico indisponível na demonstração.</p>
+          ) : followUp.length === 0 ? (
+            <p className="empty">Nenhum acompanhamento clínico disponível.</p>
+          ) : (
+            <div className="dashboard-followup-list">
+              {followUp.map((item, index) => (
+                <div className="dashboard-followup-row" key={item.paciente_id ?? index}>
+                  <div className="dashboard-followup-head">
+                    <strong>{item.paciente_nome}</strong>
+                    <span className="status-pill">
+                      {item.percepcao_paciente === "melhorou" ? "Melhorou"
+                        : item.percepcao_paciente === "piorou" ? "Piorou"
+                          : item.percepcao_paciente === "igual" ? "Igual" : "Sem percepção"}
+                    </span>
+                  </div>
+                  <p>
+                    {item.dor_atual != null
+                      ? item.dor_anterior != null
+                        ? `Dor ${item.dor_anterior} → ${item.dor_atual}`
+                        : `Dor atual: ${item.dor_atual}/10`
+                      : "Dor não informada"}
+                    {item.sessoes_sem_melhora >= 2 && (
+                      <span className="dashboard-followup-alert">
+                        {` · ${item.sessoes_sem_melhora} sessões sem melhora`}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
       <section className="module-section">
@@ -900,12 +1045,19 @@ function PatientDetail({
     if (!patient) return;
     const f = new FormData(e.currentTarget);
     const text = (key: string) => String(f.get(key) || "").trim();
+    const dor = text("dor_atual");
+    const percepcao = text("percepcao_paciente");
     const input: ConsultationInput = {
       paciente_id: patient.id,
       queixa_principal: text("queixa"),
       diagnostico: text("diagnostico") || null,
       prescricao: text("prescricao") || null,
       observacoes: text("observacoes") || null,
+      dor_atual: dor === "" ? null : Number(dor),
+      percepcao_paciente:
+        percepcao === "melhorou" || percepcao === "igual" || percepcao === "piorou"
+          ? percepcao
+          : null,
     };
     if (!input.queixa_principal) {
       setSaveError("Informe a queixa principal.");
@@ -962,7 +1114,7 @@ function PatientDetail({
       </div>
     );
   return (
-    <>
+    <div className="patient-detail">
       <button
         className="text-button back-link"
         onClick={() => navigate("/pacientes")}
@@ -1007,15 +1159,25 @@ function PatientDetail({
                 <h2>Histórico de atendimentos</h2>
                 <p>Registros em ordem do mais recente para o mais antigo.</p>
               </div>
-              <button
-                className="primary"
-                onClick={() => {
-                  setSaveError("");
-                  setAdd(true);
-                }}
-              >
-                <Plus size={17} /> Novo atendimento
-              </button>
+              <div className="history-actions">
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => window.print()}
+                  disabled={historyBusy || Boolean(error) || records.length === 0}
+                >
+                  <Printer size={17} /> Imprimir / Salvar PDF
+                </button>
+                <button
+                  className="primary"
+                  onClick={() => {
+                    setSaveError("");
+                    setAdd(true);
+                  }}
+                >
+                  <Plus size={17} /> Novo atendimento
+                </button>
+              </div>
             </div>
             {error && (
               <p role="alert" className="error">
@@ -1039,6 +1201,20 @@ function PatientDetail({
                     {demo && " · Demonstração"}
                   </span>
                   <h3>{c.queixa_principal}</h3>
+                  <div className="consultation-clinical">
+                    <span>
+                      Dor atual: {c.dor_atual != null ? `${c.dor_atual}/10` : "Não informada"}
+                    </span>
+                    <span>
+                      Percepção: {c.percepcao_paciente === "melhorou"
+                        ? "Melhorou"
+                        : c.percepcao_paciente === "igual"
+                          ? "Permaneceu igual"
+                          : c.percepcao_paciente === "piorou"
+                            ? "Piorou"
+                            : c.percepcao_paciente || "Não informada"}
+                    </span>
+                  </div>
                   {[
                     ["Diagnóstico", c.diagnostico],
                     ["Conduta / prescrição", c.prescricao],
@@ -1114,6 +1290,24 @@ function PatientDetail({
               Observações
               <textarea name="observacoes" rows={2} />
             </label>
+            <label>
+              Dor atual (escala de 0 a 10)
+              <select name="dor_atual" defaultValue="">
+                <option value="">Não informada</option>
+                {Array.from({ length: 11 }, (_, value) => (
+                  <option key={value} value={value}>{value}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Percepção da paciente
+              <select name="percepcao_paciente" defaultValue="">
+                <option value="">Não informada</option>
+                <option value="melhorou">Melhorou</option>
+                <option value="igual">Permaneceu igual</option>
+                <option value="piorou">Piorou</option>
+              </select>
+            </label>
             {saveError && (
               <p className="error" role="alert">
                 {saveError}
@@ -1135,7 +1329,7 @@ function PatientDetail({
           </form>
         </Modal>
       )}
-    </>
+    </div>
   );
 }
 export default function App() {
