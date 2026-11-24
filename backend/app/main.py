@@ -1021,6 +1021,27 @@ def atualizar_status_agendamento(
             detail="Agendamento não encontrado.",
         )
 
+    if dados.status == agendamento.status:
+        return agendamento
+
+    if agendamento.status != "agendado":
+        raise HTTPException(
+            status_code=409,
+            detail="Este agendamento já foi finalizado ou cancelado.",
+        )
+
+    if dados.status == "agendado":
+        raise HTTPException(
+            status_code=409,
+            detail="Não é permitido reabrir um agendamento.",
+        )
+
+    if dados.status == "realizado" and usuario_atual.cargo == "recepcao":
+        raise HTTPException(
+            status_code=403,
+            detail="A recepção não pode concluir atendimentos.",
+        )
+
     agendamento.status = dados.status
 
     db.commit()
