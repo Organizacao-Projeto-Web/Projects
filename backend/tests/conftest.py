@@ -110,6 +110,16 @@ def app_context(test_engine):
 
 
 @pytest.fixture(autouse=True)
+def limpar_rate_limits_entre_testes():
+    # Limpa o limite por IP (SlowAPI).
+    # Limpa o limite por e-mail (limits).
+    from app.main import limiter, login_storage
+
+    limiter.reset()
+    login_storage.reset()
+
+
+@pytest.fixture(autouse=True)
 def limpar_banco_entre_testes(app_context, test_engine):
     from app.core.database import Base
 

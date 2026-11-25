@@ -15,6 +15,10 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
+from limits import parse
+from limits.storage import MemoryStorage
+from limits.strategies import MovingWindowRateLimiter
+
 # Importação única e correta do banco de dados
 from app.core.database import Base, engine, get_db
 from app.core.dependencies import obter_usuario_atual, oauth2_scheme
@@ -78,6 +82,11 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 
+# Controle de tentativas de login por e-mail
+login_storage = MemoryStorage()
+login_strategy = MovingWindowRateLimiter(login_storage)
+LIMITE_LOGIN_CONTA = parse("5/15minute")
+
 # Origens permitidas para o frontend
 load_dotenv()
 
@@ -99,7 +108,6 @@ app.add_middleware(
 )
 
 
-
 @app.get("/")
 def home():
     return {"mensagem": "API de Prontuário Eletrônico rodando com sucesso!"}
@@ -113,7 +121,9 @@ def home():
     response_model=PrimeiroCadastroResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("3/minute")
 def primeiro_cadastro(
+    request: Request,
     cadastro: PrimeiroCadastro,
     db: Session = Depends(get_db),
 ):
@@ -234,7 +244,9 @@ def listar_equipe_admin(
     usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
 ):
     if usuario_atual.cargo != "admin":
-        raise HTTPException(status_code=403, detail="Acesso exclusivo do administrador.")
+        raise HTTPException(
+            status_code=403, detail="Acesso exclusivo do administrador."
+        )
     return (
         db.query(UsuarioModel)
         .filter(UsuarioModel.clinica_id == usuario_atual.clinica_id)
@@ -251,7 +263,9 @@ def editar_usuario(
     usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
 ):
     if usuario_atual.cargo != "admin":
-        raise HTTPException(status_code=403, detail="Acesso exclusivo do administrador.")
+        raise HTTPException(
+            status_code=403, detail="Acesso exclusivo do administrador."
+        )
 
     usuario = (
         db.query(UsuarioModel)
@@ -267,24 +281,39 @@ def editar_usuario(
     alteracoes = dados.model_dump(exclude_unset=True)
     if not alteracoes:
         raise HTTPException(status_code=422, detail="Informe pelo menos um campo.")
-    if any(valor is None for campo, valor in alteracoes.items() if campo in ("nome", "email", "cargo", "ativo")):
-        raise HTTPException(status_code=422, detail="Campo obrigatório não pode ser nulo.")
+    if any(
+        valor is None
+        for campo, valor in alteracoes.items()
+        if campo in ("nome", "email", "cargo", "ativo")
+    ):
+        raise HTTPException(
+            status_code=422, detail="Campo obrigatório não pode ser nulo."
+        )
 
     # Nunca modificar o cargo de um admin, nem desativar a própria conta.
     if usuario.cargo == "admin" and ("cargo" in alteracoes or "ativo" in alteracoes):
-        raise HTTPException(status_code=403, detail="Não é permitido alterar cargo ou situação de administrador.")
+        raise HTTPException(
+            status_code=403,
+            detail="Não é permitido alterar cargo ou situação de administrador.",
+        )
     if usuario.id == usuario_atual.id and alteracoes.get("ativo") is False:
-        raise HTTPException(status_code=403, detail="Não é permitido desativar a própria conta.")
+        raise HTTPException(
+            status_code=403, detail="Não é permitido desativar a própria conta."
+        )
 
     if "email" in alteracoes:
         alteracoes["email"] = str(alteracoes["email"])
         outro = (
             db.query(UsuarioModel)
-            .filter(UsuarioModel.email == alteracoes["email"], UsuarioModel.id != usuario_id)
+            .filter(
+                UsuarioModel.email == alteracoes["email"], UsuarioModel.id != usuario_id
+            )
             .first()
         )
         if outro is not None:
-            raise HTTPException(status_code=409, detail="E-mail já cadastrado no sistema.")
+            raise HTTPException(
+                status_code=409, detail="E-mail já cadastrado no sistema."
+            )
 
     for campo, valor in alteracoes.items():
         setattr(usuario, campo, valor)
@@ -293,23 +322,37 @@ def editar_usuario(
         db.refresh(usuario)
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Não foi possível atualizar o usuário.")
+        raise HTTPException(
+            status_code=409, detail="Não foi possível atualizar o usuário."
+        )
     return usuario
 
 
 @app.post("/api/auth/login", response_model=Token)
+@limiter.limit("20/minute")
 def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    usuario = (
-        db.query(UsuarioModel).filter(UsuarioModel.email == form_data.username).first()
-    )
+    email = form_data.username.strip().lower()
+
+    # Verifica se o e-mail atingiu o limite de falhas.
+    if not login_strategy.test(LIMITE_LOGIN_CONTA, "login", email):
+        raise HTTPException(
+            status_code=429,
+            detail="Muitas tentativas de login. Tente novamente em alguns minutos.",
+        )
+
+    usuario = db.query(UsuarioModel).filter(UsuarioModel.email == email).first()
 
     if not usuario or not verificar_senha(
         form_data.password,
         usuario.senha_hash,
     ):
+        # Somente tentativas inválidas são contabilizadas.
+        login_strategy.hit(LIMITE_LOGIN_CONTA, "login", email)
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-mail ou senha incorretos.",
@@ -599,11 +642,20 @@ def criar_paciente(
         db.commit()
         db.refresh(novo_paciente)
         return novo_paciente
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
+
+        if getattr(exc.orig, "args", (None,))[
+            0
+        ] == 1062 and "uq_pacientes_clinica_cpf" in str(exc.orig):
+            raise HTTPException(
+                status_code=400,
+                detail="Já existe paciente com este CPF nesta clínica.",
+            )
+
         raise HTTPException(
             status_code=400,
-            detail="Já existe um paciente cadastrado com este CPF.",
+            detail="Não foi possível cadastrar a paciente. Confira os dados informados.",
         )
 
 
@@ -685,11 +737,21 @@ def atualizar_paciente(
     try:
         db.commit()
         db.refresh(paciente)
-    except IntegrityError:
+
+    except IntegrityError as exc:
         db.rollback()
+
+        if getattr(exc.orig, "args", (None,))[
+            0
+        ] == 1062 and "uq_pacientes_clinica_cpf" in str(exc.orig):
+            raise HTTPException(
+                status_code=409,
+                detail="Já existe paciente com este CPF nesta clínica.",
+            )
+
         raise HTTPException(
             status_code=409,
-            detail="CPF já cadastrado.",
+            detail="Não foi possível atualizar a paciente. Confira os dados informados.",
         )
 
     return paciente

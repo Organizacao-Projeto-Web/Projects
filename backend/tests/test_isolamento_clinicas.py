@@ -349,7 +349,7 @@ def test_atualizar_paciente_com_cpf_duplicado(client):
     )
 
     assert response.status_code == 409
-    assert response.json()["detail"] == "CPF já cadastrado."
+    assert response.json()["detail"] == "Já existe paciente com este CPF nesta clínica."
 
 
 def test_atualizar_paciente_rejeita_dados_invalidos(client):
@@ -406,3 +406,25 @@ def test_atualizar_paciente_permite_limpar_campos_opcionais(client):
     assert atualizado["cpf"] is None
     assert atualizado["telefone"] is None
     assert atualizado["data_nascimento"] is None
+
+
+def test_mesmo_cpf_entre_clinicas_e_permitido(client):
+    cenario = preparar_cenario(client)
+    response = client.post(
+        "/api/pacientes",
+        headers=cenario["headers_b"],
+        json={"nome": "Paciente de outra clinica", "cpf": "11111111111"},
+    )
+    assert response.status_code == 201, response.json()
+    assert response.json()["clinica_id"] == cenario["clinica_b"]["id"]
+
+
+def test_cpf_repetido_na_mesma_clinica_e_rejeitado(client):
+    cenario = preparar_cenario(client)
+    response = client.post(
+        "/api/pacientes",
+        headers=cenario["headers_a"],
+        json={"nome": "Paciente repetida", "cpf": "11111111111"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Já existe paciente com este CPF nesta clínica."

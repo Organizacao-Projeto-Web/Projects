@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -7,10 +7,11 @@ from app.core.database import Base
 
 class PacienteModel(Base):
     __tablename__ = "pacientes"
+    __table_args__ = (UniqueConstraint("clinica_id", "cpf", name="uq_pacientes_clinica_cpf"),)
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     nome = Column(String(255), nullable=False)
-    cpf = Column(String(11), unique=True, index=True, nullable=True)
+    cpf = Column(String(11), nullable=True)
     data_nascimento = Column(Date, nullable=True)
     telefone = Column(String(15), nullable=True)
     clinica_id = Column(Integer, ForeignKey("clinicas.id"), nullable=False)
