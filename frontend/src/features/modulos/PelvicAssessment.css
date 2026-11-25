@@ -1,0 +1,10 @@
+/* Fisioterapia Pélvica — campos clínicos, sem sobrescrever os estilos do Reab. */
+.pelvic-form { margin: 18px 0; padding: 20px; background: #f8faff; border: 1px solid var(--line); border-radius: var(--radius); }
+.pelvic-fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+.pelvic-fieldset legend { font-weight: 700; padding: 0 5px; }
+.pelvic-checkboxes { display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap: 10px; margin-top: 8px; }
+.pelvic-checkboxes label { display: flex; align-items: center; gap: 8px; }
+.pelvic-checkboxes input { width: auto; }
+.pelvic-record-details { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
+.pelvic-record-details p { overflow-wrap: anywhere; margin: 5px 0; }
+@media (max-width: 480px) { .pelvic-form { padding: 12px; } .pelvic-checkboxes { grid-template-columns: 1fr; } }

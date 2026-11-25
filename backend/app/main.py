@@ -2,11 +2,10 @@ from typing import List
 import jwt
 import os
 from dotenv import load_dotenv
-from jose import JWTError  # Importado para capturar a exceção do token JWT
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta, timezone
@@ -18,6 +17,8 @@ from slowapi.middleware import SlowAPIMiddleware
 
 # Importação única e correta do banco de dados
 from app.core.database import Base, engine, get_db
+from app.core.dependencies import obter_usuario_atual, oauth2_scheme
+from app.routers.avaliacoes import router as avaliacoes_router
 from app.core.email import EmailEnvioError, enviar_codigo_recuperacao
 from app.core.security import (
     ALGORITHM,
@@ -60,6 +61,7 @@ from app.schemas.user import (
     Token,
     TokenData,
     UsuarioCreate,
+    UsuarioUpdate,
     UsuarioResponse,
 )
 from app.schemas.appointment import (
@@ -69,6 +71,7 @@ from app.schemas.appointment import (
 )
 
 app = FastAPI(title="Prontuário Eletrônico API", version="1.0.0")
+app.include_router(avaliacoes_router)
 
 # Proteção contra excesso de requisições
 limiter = Limiter(key_func=get_remote_address)
@@ -95,35 +98,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-
-
-def obter_usuario_atual(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Não foi possível validar as credenciais",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-
-        if email is None:
-            raise credentials_exception
-
-    except (JWTError, jwt.PyJWTError):
-        raise credentials_exception
-
-    usuario = db.query(UsuarioModel).filter(UsuarioModel.email == email).first()
-
-    if usuario is None or not usuario.ativo:
-        raise credentials_exception
-
-    return usuario
 
 
 @app.get("/")
@@ -252,6 +226,75 @@ def criar_usuario(
             status_code=400,
             detail="Não foi possível criar o usuário.",
         )
+
+
+@app.get("/api/usuarios/equipe", response_model=List[UsuarioResponse])
+def listar_equipe_admin(
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    if usuario_atual.cargo != "admin":
+        raise HTTPException(status_code=403, detail="Acesso exclusivo do administrador.")
+    return (
+        db.query(UsuarioModel)
+        .filter(UsuarioModel.clinica_id == usuario_atual.clinica_id)
+        .order_by(UsuarioModel.nome.asc())
+        .all()
+    )
+
+
+@app.patch("/api/usuarios/{usuario_id}", response_model=UsuarioResponse)
+def editar_usuario(
+    usuario_id: int,
+    dados: UsuarioUpdate,
+    db: Session = Depends(get_db),
+    usuario_atual: UsuarioModel = Depends(obter_usuario_atual),
+):
+    if usuario_atual.cargo != "admin":
+        raise HTTPException(status_code=403, detail="Acesso exclusivo do administrador.")
+
+    usuario = (
+        db.query(UsuarioModel)
+        .filter(
+            UsuarioModel.id == usuario_id,
+            UsuarioModel.clinica_id == usuario_atual.clinica_id,
+        )
+        .first()
+    )
+    if usuario is None:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+
+    alteracoes = dados.model_dump(exclude_unset=True)
+    if not alteracoes:
+        raise HTTPException(status_code=422, detail="Informe pelo menos um campo.")
+    if any(valor is None for campo, valor in alteracoes.items() if campo in ("nome", "email", "cargo", "ativo")):
+        raise HTTPException(status_code=422, detail="Campo obrigatório não pode ser nulo.")
+
+    # Nunca modificar o cargo de um admin, nem desativar a própria conta.
+    if usuario.cargo == "admin" and ("cargo" in alteracoes or "ativo" in alteracoes):
+        raise HTTPException(status_code=403, detail="Não é permitido alterar cargo ou situação de administrador.")
+    if usuario.id == usuario_atual.id and alteracoes.get("ativo") is False:
+        raise HTTPException(status_code=403, detail="Não é permitido desativar a própria conta.")
+
+    if "email" in alteracoes:
+        alteracoes["email"] = str(alteracoes["email"])
+        outro = (
+            db.query(UsuarioModel)
+            .filter(UsuarioModel.email == alteracoes["email"], UsuarioModel.id != usuario_id)
+            .first()
+        )
+        if outro is not None:
+            raise HTTPException(status_code=409, detail="E-mail já cadastrado no sistema.")
+
+    for campo, valor in alteracoes.items():
+        setattr(usuario, campo, valor)
+    try:
+        db.commit()
+        db.refresh(usuario)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Não foi possível atualizar o usuário.")
+    return usuario
 
 
 @app.post("/api/auth/login", response_model=Token)

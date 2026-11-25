@@ -43,6 +43,17 @@ class UsuarioCreate(UsuarioBase):
     )
 
 
+class UsuarioUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nome: Optional[str] = Field(default=None, min_length=2, max_length=150)
+    email: Optional[EmailStr] = None
+    whatsapp: Optional[str] = Field(default=None, min_length=10, max_length=20)
+    crefito: Optional[str] = Field(default=None, min_length=3, max_length=30)
+    cargo: Optional[Literal["fisioterapeuta", "recepcao"]] = None
+    ativo: Optional[bool] = None
+
+
 class UsuarioResponse(UsuarioBase):
     model_config = ConfigDict(from_attributes=True)
 

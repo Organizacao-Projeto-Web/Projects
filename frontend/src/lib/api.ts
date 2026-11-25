@@ -1,5 +1,6 @@
 import type {
   Consultation,
+  ClinicalAssessment, ClinicalAssessmentInput, ClinicalModuleSlug, ModuleAssessmentCount,
   ConsultationInput,
   Patient,
   PatientInput,
@@ -61,7 +62,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return data as T;
 }
 export const api = {
+  clinicalAssessments: (patientId: number, modulo: ClinicalModuleSlug) =>
+    request<ClinicalAssessment[]>(`/pacientes/${patientId}/avaliacoes?modulo=${encodeURIComponent(modulo)}`),
+  allClinicalAssessments: (patientId: number) => request<ClinicalAssessment[]>(`/pacientes/${patientId}/avaliacoes`),
+  clinicalAssessmentCounts: () => request<ModuleAssessmentCount[]>("/dashboard/avaliacoes-por-modulo"),
+  clinicalAssessment: (id: number) => request<ClinicalAssessment>(`/avaliacoes/${id}`),
+  createClinicalAssessment: (patientId: number, data: ClinicalAssessmentInput) =>
+    request<ClinicalAssessment>(`/pacientes/${patientId}/avaliacoes`, { method: "POST", body: JSON.stringify(data) }),
   professionals: () => request<User[]>("/usuarios/profissionais"),
+  team: () => request<User[]>("/usuarios/equipe"),
+  updateUser: (id: number, data: { nome?: string; email?: string; whatsapp?: string | null; crefito?: string | null; cargo?: "fisioterapeuta" | "recepcao"; ativo?: boolean }) => request<User>(`/usuarios/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   createUser: (data: UserInput) => request<User>("/usuarios", {method: "POST", body: JSON.stringify(data)}),
   register: (data: Registration) => request("/cadastro", {method: "POST", body: JSON.stringify(data)}),
   requestReset: (email: string) => request<{mensagem: string}>("/auth/recuperacao-senha/solicitar", {method: "POST", body: JSON.stringify({email})}),

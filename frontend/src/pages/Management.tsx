@@ -3,7 +3,8 @@ import type { FormEvent, ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { Plus, Search, Users, CalendarDays, Download } from "lucide-react";
 import { api, ApiError } from "../lib/api";
-import type { User, Patient, UserInput, Appointment, AppointmentStatus, AppointmentInput } from "../lib/types";
+import type { User, Patient, UserInput, Appointment, AppointmentStatus, AppointmentInput, ClinicalModuleSlug } from "../lib/types";
+import { modules } from "../features/modulos/registry";
 import { Modal } from "../components/Modal";
 
 export const roleLabel = (role: User["cargo"]) => ({ admin: "Administrador", fisioterapeuta: "Fisioterapeuta", recepcao: "Recepção" })[role];
@@ -21,12 +22,13 @@ export function Professionals({ user, demo, added, onAdd }: { user: User; demo: 
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("all");
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<User | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [success, setSuccess] = useState("");
   async function load() {
     setBusy(true); setError(""); setMissing(false);
-    try { setRows(demo ? [user] : await api.professionals()); }
+    try { setRows(demo ? [user] : user.cargo === "admin" ? await api.team() : await api.professionals()); }
     catch (e) { if (e instanceof ApiError && e.status === 404) { setMissing(true); setRows([]); } else setError((e as Error).message); }
     finally { setBusy(false); }
   }
@@ -47,12 +49,72 @@ export function Professionals({ user, demo, added, onAdd }: { user: User; demo: 
       setOpen(false); setSuccess(demo ? "Cadastro temporário criado na demonstração." : "Usuário cadastrado com sucesso.");
     } catch (e) { setSaveError((e as Error).message); } finally { setSaving(false); }
   }
+  async function saveEdit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editing || user.cargo !== "admin") return;
+    setSaving(true); setSaveError("");
+    const f = new FormData(e.currentTarget);
+    const changes = {
+      nome: String(f.get("nome") || "").trim(),
+      email: String(f.get("email") || "").trim(),
+      whatsapp: String(f.get("whatsapp") || "").trim() || null,
+      crefito: String(f.get("crefito") || "").trim() || null,
+      ...editing.cargo !== "admin" ? {
+        cargo: String(f.get("cargo")) as "fisioterapeuta" | "recepcao",
+        ativo: f.get("ativo") === "on",
+      } : {},
+    };
+    try {
+      if (changes.nome.length < 2) throw new Error("Informe um nome válido.");
+      const updated = demo ? { ...editing, ...changes } : await api.updateUser(editing.id, changes);
+      if (demo) setRows(current => current.map(item => item.id === editing.id ? updated : item));
+      else await load();
+      setEditing(null);
+      setSuccess("Dados do usuário atualizados.");
+    } catch (error) { setSaveError((error as Error).message); }
+    finally { setSaving(false); }
+  }
   return <><Heading title="Profissionais" subtitle="Pessoas que fazem parte do cuidado.">{user.cargo === "admin" && <button className="primary" onClick={() => { setSaveError(""); setOpen(true); }}><Plus size={18} /> Cadastrar usuário</button>}</Heading>
-    {missing ? <Notice>A listagem de profissionais depende de uma rota que ainda não está disponível neste backend. Administradores podem cadastrar usuários.</Notice> : <Notice>{demo ? "Equipe fictícia para explorar a interface." : "Esta listagem retorna profissionais clínicos ativos permitidos ao seu perfil."}</Notice>}
+    {missing ? <Notice>A listagem de profissionais depende de uma rota que ainda não está disponível neste backend. Administradores podem cadastrar usuários.</Notice> : <Notice>{demo ? "Equipe fictícia para explorar a interface." : "Esta listagem apresenta os integrantes da equipe permitidos ao seu perfil."}</Notice>}
     {user.cargo !== "admin" && <Notice>Somente o administrador pode cadastrar integrantes da equipe.</Notice>}
     {success && <Notice>{success}</Notice>}<Failure message={error} retry={() => void load()} />
     <section className="panel"><div className="table-toolbar"><label className="search-input"><Search size={18} /><input aria-label="Buscar profissional" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar nome, e-mail ou CREFITO" /></label><select aria-label="Filtrar cargo" value={role} onChange={e => setRole(e.target.value)}><option value="all">Todos os cargos</option><option value="admin">Administrador</option><option value="fisioterapeuta">Fisioterapeuta</option><option value="recepcao">Recepção</option></select></div>
-      {busy ? <p className="empty" role="status">Carregando profissionais…</p> : missing ? <p className="empty">Listagem aguardando integração.</p> : error ? <p className="empty">Não foi possível carregar a equipe.</p> : !visible.length ? <div className="empty"><Users /><h3>Nenhum profissional encontrado</h3><p>Confira os filtros selecionados.</p></div> : <div className="table-scroll"><table><thead><tr><th>Profissional</th><th>Cargo</th><th>CREFITO</th><th>Situação</th></tr></thead><tbody>{visible.map(u => <tr key={u.id}><td><strong>{u.nome}</strong><small className="cell-detail">{u.email}</small></td><td>{roleLabel(u.cargo)}</td><td>{u.crefito || "Não informado"}</td><td><span className="status-pill">{u.ativo ? "Ativo" : "Inativo"}</span></td></tr>)}</tbody></table></div>}</section>
+      {busy ? <p className="empty" role="status">Carregando profissionais…</p> : missing ? <p className="empty">Listagem aguardando integração.</p> : error ? <p className="empty">Não foi possível carregar a equipe.</p> : !visible.length ? <div className="empty"><Users /><h3>Nenhum profissional encontrado</h3><p>Confira os filtros selecionados.</p></div> : <div className="table-scroll"><table><thead><tr><th>Profissional</th><th>Cargo</th><th>CREFITO</th><th>Situação</th>{user.cargo === "admin" && <th>Ações</th>}</tr></thead><tbody>{visible.map(u => <tr key={u.id}><td><strong>{u.nome}</strong><small className="cell-detail">{u.email}</small></td><td>{roleLabel(u.cargo)}</td><td>{u.crefito || "Não informado"}</td><td><span className="status-pill">{u.ativo ? "Ativo" : "Inativo"}</span></td>{user.cargo === "admin" && <td><button type="button" className="text-button" onClick={() => { setSaveError(""); setEditing(u); }}>Editar</button></td>}</tr>)}</tbody></table></div>}</section>
+    {editing && <Modal title={`Editar usuário — ${editing.nome}`} onClose={() => setEditing(null)} busy={saving}>
+      <form className="form-stack" onSubmit={saveEdit} key={editing.id}>
+        <label>Nome<input name="nome" defaultValue={editing.nome} minLength={2} maxLength={150} required /></label>
+        <label>E-mail<input name="email" type="email" defaultValue={editing.email} required /></label>
+        <div className="form-grid">
+          <label>WhatsApp<input name="whatsapp" type="tel" defaultValue={editing.whatsapp || ""} pattern="[0-9]{10,20}" /></label>
+          <label>CREFITO<input name="crefito" defaultValue={editing.crefito || ""} minLength={3} maxLength={30} /></label>
+        </div>
+        {editing.cargo !== "admin" && (
+          <>
+            <label>
+              Cargo
+              <select name="cargo" defaultValue={editing.cargo}>
+                <option value="fisioterapeuta">Fisioterapeuta</option>
+                <option value="recepcao">Recepção</option>
+              </select>
+            </label>
+
+            <div className="active-user-field">
+              <input
+                id={`usuario-ativo-${editing.id}`}
+                type="checkbox"
+                name="ativo"
+                defaultChecked={editing.ativo}
+              />
+              <label htmlFor={`usuario-ativo-${editing.id}`}>
+                Usuário ativo
+              </label>
+            </div>
+          </>
+        )}
+        <Failure message={saveError} />
+        <div className="modal-actions"><button type="button" className="secondary" onClick={() => setEditing(null)} disabled={saving}>Cancelar</button><button className="primary" disabled={saving}>{saving ? "Salvando…" : "Salvar alterações"}</button></div>
+      </form>
+    </Modal>}
     {open && <Modal title="Cadastrar integrante da equipe" onClose={() => setOpen(false)} busy={saving}><form className="form-stack" onSubmit={save}><label>Nome<input name="nome" required minLength={2} maxLength={150} /></label><label>E-mail<input name="email" type="email" required /></label><div className="form-grid"><label>Cargo<select name="cargo"><option value="fisioterapeuta">Fisioterapeuta</option><option value="recepcao">Recepção</option></select></label><label>CREFITO (opcional)<input name="crefito" minLength={3} maxLength={30} /></label></div><label>WhatsApp com DDD (somente dígitos)<input name="whatsapp" type="tel" required pattern="[0-9]{10,20}" maxLength={20} /></label><label>Senha inicial<input name="senha" type="password" required minLength={8} maxLength={128} autoComplete="new-password" /></label><Failure message={saveError} /><div className="modal-actions"><button type="button" className="secondary" disabled={saving} onClick={() => setOpen(false)}>Cancelar</button><button className="primary" disabled={saving}>{saving ? "Salvando…" : "Cadastrar usuário"}</button></div></form></Modal>}
   </>;
 }
@@ -60,6 +122,8 @@ export function Professionals({ user, demo, added, onAdd }: { user: User; demo: 
 const localDay = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const statusLabel = { agendado: "Agendado", realizado: "Realizado", cancelado: "Cancelado" };
 export function Agenda({ user, demo, patients, appointments, onAppointments }: { user: User; demo: boolean; patients: Patient[]; appointments: Appointment[]; onAppointments: (a: Appointment[]) => void }) {
+  const [modulosEscolhidos, setModulosEscolhidos] = useState<Record<number, ClinicalModuleSlug | "">>({});
+  const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
   const [team, setTeam] = useState<User[]>([]);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
@@ -80,7 +144,7 @@ export function Agenda({ user, demo, patients, appointments, onAppointments }: {
   useEffect(() => { void load(); }, [demo, user.id]);
   const visible = appointments.filter(a => (!day || a.data_hora.slice(0, 10) === day) && (status === "all" || a.status === status)).sort((a, b) => a.data_hora.localeCompare(b.data_hora));
   async function save(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setSaving(true); setSaveError("");
+    e.preventDefault(); setSaveError("");
     const f = new FormData(e.currentTarget);
     const data: AppointmentInput = { paciente_id: Number(f.get("paciente")), profissional_id: Number(f.get("profissional")), data_hora: String(f.get("horario")), duracao_minutos: Number(f.get("duracao")), observacoes: String(f.get("observacoes") || "").trim() || null };
     try {
@@ -91,6 +155,17 @@ export function Agenda({ user, demo, patients, appointments, onAppointments }: {
         throw new Error("Selecione uma data e um horário futuros para o agendamento.");
       }
       if (demo && appointments.some(a => a.profissional_id === data.profissional_id && a.status !== "cancelado" && start < new Date(a.data_hora).getTime() + a.duracao_minutos * 60000 && end > new Date(a.data_hora).getTime())) throw new Error("Já existe um agendamento para este profissional nesse horário.");
+      const pacienteSelecionada = patients.find(p => p.id === data.paciente_id);
+      const profissionalSelecionado = team.find(p => p.id === data.profissional_id);
+      if (!pacienteSelecionada || !profissionalSelecionado) {
+        throw new Error("Selecione uma paciente e um profissional válidos para o agendamento.");
+      }
+      if (!window.confirm(
+        `CONFIRME O AGENDAMENTO\n\nPaciente: ${pacienteSelecionada.nome} (ID ${pacienteSelecionada.id})\n` +
+        `Profissional: ${profissionalSelecionado.nome}\nHorário: ${data.data_hora.replace("T", " ")}\n\n` +
+        "Esses dados estão corretos?"
+      )) return;
+      setSaving(true);
       const saved: Appointment = demo ? { ...data, id: Date.now(), clinica_id: user.clinica_id, created_at: new Date().toISOString(), status: "agendado" } : await api.createAppointment(data);
       onAppointments([...appointments, saved]); setDay(saved.data_hora.slice(0, 10)); setStatus("all"); setOpen(false);
     } catch (e) { setSaveError((e as Error).message); } finally { setSaving(false); }
@@ -101,12 +176,22 @@ export function Agenda({ user, demo, patients, appointments, onAppointments }: {
     try { const saved = demo ? { ...a, status: next } : await api.appointmentStatus(a.id, next); onAppointments(appointments.map(item => item.id === saved.id ? saved : item)); }
     catch (e) { setError((e as Error).message); } finally { setSaving(false); }
   }
-  return <><Heading title="Agenda" subtitle="Organize os horários e acompanhe os atendimentos."><button className="primary" disabled={busy || missing || !!error || !patients.length || !team.length} onClick={() => { setSaveError(""); setOpen(true); }}><Plus size={18} /> Novo agendamento</button></Heading>
+  return <><Heading title="Agenda" subtitle="Organize os horários e acompanhe os atendimentos."><button className="primary" disabled={busy || missing || !!error || !patients.length || !team.length} onClick={() => { setSaveError(""); setSelectedPatientId(null); setOpen(true); }}><Plus size={18} /> Novo agendamento</button></Heading>
     {missing && <Notice>A agenda ainda não está habilitada neste backend. A equipe precisa integrar as rotas de agendamentos. Você pode conhecer o fluxo no modo demonstração.</Notice>}
     <Failure message={error} retry={() => void load()} />
     {!busy && !missing && !error && !patients.length && <Notice>Cadastre uma paciente antes de agendar. <NavLink to="/pacientes">Abrir pacientes</NavLink></Notice>}
     <section className="panel"><div className="table-toolbar"><label>Data <input type="date" value={day} onChange={e => setDay(e.target.value)} /></label><button className="secondary" onClick={() => setDay(localDay())}>Hoje</button><button className="text-button" onClick={() => setDay("")}>Todas as datas</button><select aria-label="Filtrar situação" value={status} onChange={e => setStatus(e.target.value)}><option value="all">Todas as situações</option>{Object.entries(statusLabel).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
-      {busy ? <p className="empty" role="status">Carregando agenda…</p> : missing ? <div className="empty"><CalendarDays /><h3>Agenda aguardando integração</h3><p>Os horários do banco serão exibidos quando a função estiver disponível.</p></div> : error ? <p className="empty">Não foi possível atualizar a agenda.</p> : !visible.length ? <div className="empty"><CalendarDays /><h3>Nenhum agendamento neste filtro</h3><p>Escolha outra data ou crie um novo horário.</p></div> : <div className="appointment-list">{visible.map(a => <article className="appointment-card" key={a.id}><div className="appointment-time"><strong>{new Date(a.data_hora).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</strong><small>{new Date(a.data_hora).toLocaleDateString("pt-BR")} · {a.duracao_minutos} min</small></div><div className="appointment-person"><h3>{patients.find(p => p.id === a.paciente_id)?.nome || `Paciente #${a.paciente_id}`}</h3><p>{team.find(p => p.id === a.profissional_id)?.nome || `Profissional #${a.profissional_id}`}</p>{a.observacoes && <p>{a.observacoes}</p>}</div><div className="appointment-actions"><span className={`status-pill ${a.status}`}>{statusLabel[a.status]}</span>{a.status === "agendado" && <>{user.cargo !== "recepcao" && <NavLink className="text-button" to={`/pacientes/${a.paciente_id}?novo=1&agendamento=${a.id}`}>Iniciar atendimento</NavLink>}{user.cargo !== "recepcao" && (
+      {busy ? <p className="empty" role="status">Carregando agenda…</p> : missing ? <div className="empty"><CalendarDays /><h3>Agenda aguardando integração</h3><p>Os horários do banco serão exibidos quando a função estiver disponível.</p></div> : error ? <p className="empty">Não foi possível atualizar a agenda.</p> : !visible.length ? <div className="empty"><CalendarDays /><h3>Nenhum agendamento neste filtro</h3><p>Escolha outra data ou crie um novo horário.</p></div> : <div className="appointment-list">{visible.map(a => <article className="appointment-card" key={a.id}><div className="appointment-time"><strong>{new Date(a.data_hora).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</strong><small>{new Date(a.data_hora).toLocaleDateString("pt-BR")} · {a.duracao_minutos} min</small></div><div className="appointment-person"><h3>{patients.find(p => p.id === a.paciente_id)?.nome || `Paciente #${a.paciente_id}`}</h3><p>{team.find(p => p.id === a.profissional_id)?.nome || `Profissional #${a.profissional_id}`}</p>{a.observacoes && <p>{a.observacoes}</p>}</div><div className="appointment-actions"><span className={`status-pill ${a.status}`}>{statusLabel[a.status]}</span>{a.status === "agendado" && <>{user.cargo !== "recepcao" && <>
+        <NavLink className="text-button" to={`/pacientes/${a.paciente_id}?novo=1&agendamento=${a.id}`}>Atendimento geral</NavLink>
+        <label className="agenda-module-select">Área especializada
+          <select aria-label={`Área clínica do agendamento ${a.id}`} value={modulosEscolhidos[a.id] || ""}
+            onChange={event => setModulosEscolhidos(prev => ({ ...prev, [a.id]: event.target.value as ClinicalModuleSlug | "" }))}>
+            <option value="">Escolher área</option>
+            {modules.map(m => <option key={m.slug} value={m.slug}>{m.name}</option>)}
+          </select>
+        </label>
+        {modulosEscolhidos[a.id] && <NavLink className="text-button" to={`/pacientes/${a.paciente_id}/modulos/${modulosEscolhidos[a.id]}?novo=1&agendamento=${a.id}`}>Iniciar avaliação</NavLink>}
+      </>}{user.cargo !== "recepcao" && (
         <button
           className="text-button"
           disabled={saving}
@@ -115,7 +200,7 @@ export function Agenda({ user, demo, patients, appointments, onAppointments }: {
           Marcar realizado
         </button>
       )}<button className="text-button danger-text" disabled={saving} onClick={() => void change(a, "cancelado")}>Cancelar</button></>}</div></article>)}</div>}</section>
-    {open && <Modal title="Novo agendamento" onClose={() => setOpen(false)} busy={saving}><form className="form-stack" onSubmit={save}><label>Paciente<select name="paciente" required defaultValue=""><option value="" disabled>Selecione a paciente</option>{patients.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></label><label>Profissional<select name="profissional" required>{team.filter(u => user.cargo !== "fisioterapeuta" || u.id === user.id).map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></label><label>Data e horário local<input type="datetime-local" name="horario" required defaultValue={`${day || localDay()}T09:00`} /></label><label>Duração (minutos)<input name="duracao" type="number" required min={15} max={240} defaultValue={60} /></label><label>Observações<textarea name="observacoes" rows={3} maxLength={1000} /></label><Failure message={saveError} /><div className="modal-actions"><button type="button" className="secondary" disabled={saving} onClick={() => setOpen(false)}>Cancelar</button><button className="primary" disabled={saving}>{saving ? "Salvando…" : "Salvar agendamento"}</button></div></form></Modal>}
+    {open && <Modal title="Novo agendamento" onClose={() => setOpen(false)} busy={saving}><form className="form-stack" onSubmit={save}><label>Paciente<select name="paciente" required defaultValue="" onChange={event => setSelectedPatientId(Number(event.target.value) || null)}><option value="" disabled>Selecione a paciente</option>{patients.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></label>{selectedPatientId !== null && <p className="feature-notice" role="status"><strong>Paciente selecionada:</strong> {patients.find(p => p.id === selectedPatientId)?.nome ?? "Não encontrada"} (ID {selectedPatientId}). Confira antes de salvar.</p>}<label>Profissional<select name="profissional" required>{team.filter(u => user.cargo !== "fisioterapeuta" || u.id === user.id).map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></label><label>Data e horário local<input type="datetime-local" name="horario" required defaultValue={`${day || localDay()}T09:00`} /></label><label>Duração (minutos)<input name="duracao" type="number" required min={15} max={240} defaultValue={60} /></label><label>Observações<textarea name="observacoes" rows={3} maxLength={1000} /></label><Failure message={saveError} /><div className="modal-actions"><button type="button" className="secondary" disabled={saving} onClick={() => setOpen(false)}>Cancelar</button><button className="primary" disabled={saving}>{saving ? "Salvando…" : "Salvar agendamento"}</button></div></form></Modal>}
   </>;
 }
 

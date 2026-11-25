@@ -71,6 +71,7 @@ def app_context(test_engine):
 
     # Registra todos os modelos no metadata do SQLAlchemy.
     from app.models.appointment import AgendamentoModel  # noqa: F401
+    from app.models.clinical_assessment import AvaliacaoClinicaModel  # noqa: F401
     from app.models.clinic import ClinicaModel  # noqa: F401
     from app.models.consultation import ConsultaModel  # noqa: F401
     from app.models.patient import PacienteModel  # noqa: F401
