@@ -535,3 +535,61 @@ def test_lista_profissionais_respeita_clinica_e_permissoes(client):
 
     assert len(profissionais_fisio) == 1
     assert profissionais_fisio[0]["id"] == fisio_a["id"]
+
+
+def test_agendamentos_simultaneos_nao_reservam_horario_sobreposto(client, app_context):
+    """Duas conexões MySQL concorrentes não podem reservar o mesmo profissional."""
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    from fastapi.testclient import TestClient
+
+    app, TestSessionLocal = app_context
+    cadastro = criar_clinica_admin(
+        client,
+        nome_clinica="Clinica Agenda Concorrente",
+        cnpj="66666666000166",
+        nome_admin="Admin Agenda Concorrente",
+        email_admin="agenda.concorrente@example.com",
+        crefito="66666-F",
+    )
+    headers = login(client, "agenda.concorrente@example.com")
+    paciente = criar_paciente(client, headers, "Paciente Concorrente", "66666666666")
+    profissional_id = cadastro["responsavel"]["id"]
+    barreira = Barrier(2)
+
+    def reservar(inicio):
+        # Cada requisição recebe sua própria sessão por meio de get_db.
+        with TestClient(app) as outro_cliente:
+            barreira.wait(timeout=10)
+            resposta = outro_cliente.post(
+                "/api/agendamentos",
+                headers=headers,
+                json={
+                    "paciente_id": paciente["id"],
+                    "profissional_id": profissional_id,
+                    "data_hora": inicio,
+                    "duracao_minutos": 60,
+                },
+            )
+            return resposta.status_code, resposta.json()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futuros = [
+            executor.submit(reservar, "2027-10-20T10:00:00"),
+            executor.submit(reservar, "2027-10-20T10:30:00"),
+        ]
+        resultados = [f.result(timeout=20) for f in futuros]
+
+    assert sorted(status for status, _ in resultados) == [201, 409], resultados
+    assert next(dados for status, dados in resultados if status == 409) == {
+        "detail": "Já existe um agendamento para este profissional nesse horário."
+    }
+
+    from app.models.appointment import AgendamentoModel
+
+    with TestSessionLocal() as db:
+        agendados = db.query(AgendamentoModel).filter(
+            AgendamentoModel.profissional_id == profissional_id
+        ).count()
+    assert agendados == 1

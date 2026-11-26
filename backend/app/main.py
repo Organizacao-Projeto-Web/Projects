@@ -1039,6 +1039,14 @@ def criar_agendamento(
 
     fim_novo = inicio_novo + timedelta(minutes=agendamento.duracao_minutos)
 
+    # Serializa as reservas do mesmo profissional no MySQL (InnoDB).
+    # O lock permanece até commit/rollback e impede que duas requisições
+    # simultâneas validem o mesmo horário antes de gravar.
+    db.query(UsuarioModel.id).filter(
+        UsuarioModel.id == profissional.id,
+        UsuarioModel.clinica_id == usuario_atual.clinica_id,
+    ).with_for_update().one()
+
     agendamentos_existentes = (
         db.query(AgendamentoModel)
         .filter(
@@ -1046,6 +1054,9 @@ def criar_agendamento(
             AgendamentoModel.clinica_id == usuario_atual.clinica_id,
             AgendamentoModel.status != "cancelado",
         )
+        # Leitura atual (locking read): não utiliza um snapshot antigo da
+        # transação REPEATABLE READ iniciado ao consultar paciente/usuário.
+        .with_for_update()
         .all()
     )
 
